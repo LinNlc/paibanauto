@@ -1,0 +1,75 @@
+# Example OpenResty / Nginx configuration for the scheduling assistant.
+# Adjust paths (root, certificate, php_fpm socket) to match the target host.
+
+upstream php_fpm {
+    # For TCP based PHP-FPM replace with: server 127.0.0.1:9000;
+    server unix:/run/php/php8.2-fpm.sock;
+}
+
+server {
+    listen 80;
+    server_name example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name example.com;
+
+    root /opt/paiban/public;
+    index index.html index.php;
+
+    ssl_certificate /etc/nginx/ssl/example.com.crt;
+    ssl_certificate_key /etc/nginx/ssl/example.com.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers 'HIGH:!aNULL:!MD5';
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header Permissions-Policy "interest-cohort=()" always;
+
+    access_log /var/log/nginx/paiban.access.log;
+    error_log /var/log/nginx/paiban.error.log warn;
+
+    # Static asset caching
+    location ~* \.(?:css|js|png|jpg|jpeg|gif|ico|svg|webp|ttf|woff2?)$ {
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800, immutable";
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Server-Sent Events must bypass buffering and gzip to stream updates.
+    location ~ ^/api/sse.php$ {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass php_fpm;
+        fastcgi_read_timeout 3600s;
+        fastcgi_buffering off;
+        proxy_buffering off;
+        add_header X-Accel-Buffering no;
+        add_header Cache-Control "no-store";
+        gzip off;
+    }
+
+    location /api/ {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass php_fpm;
+        fastcgi_intercept_errors on;
+    }
+
+    # Block direct access to non-public resources
+    location ~ ^/(?:schema|bin|config|data|docs)/ {
+        deny all;
+    }
+
+    client_max_body_size 10m;
+}
