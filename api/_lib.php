@@ -44,7 +44,20 @@ function json_err(string $message, int $status = 400, array $extra = []): void
     echo json_encode(array_merge([
         'ok' => false,
         'error' => $message,
+        'msg' => $message,
     ], $extra), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+function permission_denied(): void
+{
+    http_response_code(403);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'ok' => false,
+        'msg' => 'forbidden',
+        'error' => 'forbidden',
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -113,12 +126,91 @@ function require_login(): array
 
 function require_admin(): array
 {
-    $user = require_login();
-    if (($user['role'] ?? '') !== 'admin') {
-        json_err('无权限', 403);
+    $context = enforce_view_access('admin');
+    if (($context['permissions']['role'] ?? '') !== 'admin') {
+        permission_denied();
     }
 
+    return $context['user'];
+}
+
+function merge_user_permissions(array $user, array $permissions): array
+{
+    $user['role'] = $permissions['role'] ?? ($user['role'] ?? '');
+    $user['is_admin'] = (bool) ($permissions['is_admin'] ?? false);
+
+    $allowedViews = $permissions['allowed_views'] ?? [];
+    if (!is_array($allowedViews)) {
+        $allowedViews = [];
+    }
+    $user['allowed_views'] = $allowedViews;
+
+    $user['allowed_teams'] = $permissions['allowed_teams'] ?? null;
+    $user['editable_teams'] = $permissions['editable_teams'] ?? null;
+
     return $user;
+}
+
+function auth_context(): array
+{
+    static $cached;
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    $user = require_login();
+    $pdo = db();
+    $permissions = load_user_permissions($pdo, (int) ($user['id'] ?? 0));
+    if ($permissions === null) {
+        permission_denied();
+    }
+
+    $user = merge_user_permissions($user, $permissions);
+    set_current_user($user);
+
+    $cached = [
+        'pdo' => $pdo,
+        'user' => $user,
+        'permissions' => $permissions,
+    ];
+
+    return $cached;
+}
+
+function enforce_view_access(string $view): array
+{
+    $context = auth_context();
+    if ($view !== '' && !permissions_can_view_section($context['permissions'], $view)) {
+        permission_denied();
+    }
+
+    return $context;
+}
+
+function enforce_edit_access(int $teamId): array
+{
+    $context = auth_context();
+    if ($teamId <= 0) {
+        json_err('缺少有效的团队', 422);
+    }
+
+    if (!permissions_can_access_team($context['permissions'], $teamId)
+        || !permissions_can_edit_team($context['permissions'], $teamId)) {
+        permission_denied();
+    }
+
+    return $context;
+}
+
+function ensure_team_access(array $permissions, int $teamId): void
+{
+    if ($teamId <= 0) {
+        json_err('缺少有效的团队', 422);
+    }
+
+    if (!permissions_can_access_team($permissions, $teamId)) {
+        permission_denied();
+    }
 }
 
 /**

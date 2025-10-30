@@ -5,20 +5,11 @@ declare(strict_types=1);
 require __DIR__ . '/_lib.php';
 
 $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
-$pdo = db();
-$user = current_user();
-if ($user === null) {
-    json_err('未登录', 401);
-}
-
-$permissions = load_user_permissions($pdo, (int) ($user['id'] ?? 0));
-if ($permissions === null) {
-    json_err('账号不可用', 403);
-}
-
-if (!permissions_can_view_section($permissions, 'schedule')) {
-    json_err('无权访问排班数据', 403);
-}
+$context = enforce_view_access('schedule');
+/** @var PDO $pdo */
+$pdo = $context['pdo'];
+$user = $context['user'];
+$permissions = $context['permissions'];
 
 switch ($method) {
     case 'GET':
@@ -47,7 +38,7 @@ function handle_schedule_get(PDO $pdo, array $user, array $permissions): void
 
     $teams = fetch_accessible_teams($pdo, $permissions);
     if ($teamId !== null && $teamId > 0 && !team_in_list($teams, $teamId)) {
-        json_err('无权访问该团队', 403);
+        permission_denied();
     }
 
     if ($teamId === null || $teamId <= 0) {
@@ -93,13 +84,9 @@ function handle_schedule_upsert(PDO $pdo, array $user, array $permissions, array
         json_err('缺少有效的团队ID', 422);
     }
 
-    if (!permissions_can_access_team($permissions, $teamId)) {
-        json_err('无权访问该团队', 403);
-    }
-
-    if (!permissions_can_edit_team($permissions, $teamId)) {
-        json_err('无权编辑该团队排班', 403);
-    }
+    $editContext = enforce_edit_access($teamId);
+    /** @var PDO $pdo */
+    $pdo = $editContext['pdo'];
 
     $day = isset($payload['day']) ? (string) $payload['day'] : '';
     $dayValue = normalize_day($day);

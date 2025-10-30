@@ -10,20 +10,10 @@ if ($method !== 'GET') {
     json_err('Method Not Allowed', 405);
 }
 
-$pdo = db();
-$user = current_user();
-if ($user === null) {
-    json_err('未登录', 401);
-}
-
-$permissions = load_user_permissions($pdo, (int) ($user['id'] ?? 0));
-if ($permissions === null) {
-    json_err('账号不可用', 403);
-}
-
-if (!permissions_can_view_section($permissions, 'stats')) {
-    json_err('无权访问统计数据', 403);
-}
+$context = enforce_view_access('stats');
+/** @var PDO $pdo */
+$pdo = $context['pdo'];
+$permissions = $context['permissions'];
 
 $action = (string) ($_GET['action'] ?? '');
 if ($action === '') {
@@ -55,7 +45,7 @@ function handle_by_person(PDO $pdo, array $permissions): void
     $teams = normalize_team_rows($teamRows);
 
     if ($teamId !== null && $teamId > 0 && !team_in_list($teams, $teamId)) {
-        json_err('无权访问该团队', 403);
+        permission_denied();
     }
 
     if ($teamId === null || $teamId <= 0) {
@@ -108,7 +98,7 @@ function handle_coverage_by_day(PDO $pdo, array $permissions): void
     $teams = normalize_team_rows($teamRows);
 
     if ($teamId !== null && $teamId > 0 && !team_in_list($teams, $teamId)) {
-        json_err('无权访问该团队', 403);
+        permission_denied();
     }
 
     if ($teamId === null || $teamId <= 0) {

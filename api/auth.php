@@ -68,11 +68,17 @@ function handle_login(): void
     ensure_session_started();
     session_regenerate_id(true);
 
+    $permissions = load_user_permissions($pdo, (int) $user['id']);
+    if ($permissions === null) {
+        json_err('账号不可用', 403);
+    }
+
     $publicUser = [
-        'id' => (int)$user['id'],
-        'display_name' => (string)$user['display_name'],
-        'role' => (string)$user['role'],
+        'id' => (int) $user['id'],
+        'display_name' => (string) $user['display_name'],
+        'role' => (string) $user['role'],
     ];
+    $publicUser = merge_user_permissions($publicUser, $permissions);
 
     set_current_user($publicUser);
 
@@ -115,12 +121,8 @@ function handle_me(): void
         json_err('Method Not Allowed', 405);
     }
 
-    $user = current_user();
-    if ($user === null) {
-        json_err('未登录', 401);
-    }
-
-    json_ok(['user' => $user]);
+    $context = auth_context();
+    json_ok(['user' => $context['user']]);
 }
 
 function is_login_rate_limited(string $username): bool

@@ -204,9 +204,10 @@
         <div class="site-logo">排班助手</div>
         <nav>
           <a href="/public/index.html">仪表盘</a>
-          <a href="/public/people.html">人员管理</a>
-          <a href="/public/schedule.html" class="opacity-100">排班表</a>
-          <a href="/admin/index.html">后台管理</a>
+          <a href="/public/people.html" data-view="people">人员管理</a>
+          <a href="/public/schedule.html" class="opacity-100" data-view="schedule">排班表</a>
+          <a href="/public/stats.html" data-view="stats">数据统计</a>
+          <a href="/admin/index.html" data-view="admin">后台管理</a>
         </nav>
       </aside>
       <main class="site-content space-y-6 pb-12">
@@ -324,6 +325,43 @@
         windowSize: 14,
       };
 
+      const CURRENT_VIEW = 'schedule';
+
+      function normalizeViewList(list) {
+        if (!Array.isArray(list)) {
+          return [];
+        }
+        return list.map((item) => String(item).toLowerCase());
+      }
+
+      function userCanAccessView(user, view) {
+        if (!view) return true;
+        if (!user) return false;
+        const normalizedView = String(view).toLowerCase();
+        if (normalizedView === 'admin' && String(user.role || '').toLowerCase() !== 'admin') {
+          return false;
+        }
+        const allowedViews = normalizeViewList(user.allowed_views);
+        if (allowedViews.includes('*')) {
+          return true;
+        }
+        return allowedViews.includes(normalizedView);
+      }
+
+      function applyViewVisibility(user) {
+        document.querySelectorAll('[data-view]').forEach((link) => {
+          const requiredView = link.dataset.view ? link.dataset.view.toLowerCase() : '';
+          if (!requiredView) {
+            return;
+          }
+          if (userCanAccessView(user, requiredView)) {
+            link.classList.remove('hidden');
+          } else {
+            link.classList.add('hidden');
+          }
+        });
+      }
+
       const pendingUpdates = new Map();
       let sseSource = null;
       let sseReconnectTimer = null;
@@ -354,8 +392,44 @@
 
       let popoverContext = null;
 
-      document.addEventListener('DOMContentLoaded', () => {
+      async function ensureLoggedIn() {
+        try {
+          const response = await fetch('/api/auth.php?action=me', {
+            method: 'GET',
+            credentials: 'include',
+          });
+          if (!response.ok) {
+            window.location.href = '/public/login.html';
+            return false;
+          }
+          const data = await response.json();
+          if (!data || !data.ok || !data.user) {
+            window.location.href = '/public/login.html';
+            return false;
+          }
+          state.user = data.user;
+          elements.userName.textContent = data.user.display_name || '';
+          applyViewVisibility(state.user);
+          if (!userCanAccessView(state.user, CURRENT_VIEW)) {
+            showToast('无权访问该视图');
+            setTimeout(() => {
+              window.location.href = '/public/index.html';
+            }, 800);
+            return false;
+          }
+          return true;
+        } catch (error) {
+          window.location.href = '/public/login.html';
+          return false;
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', async () => {
         attachEventListeners();
+        const allowed = await ensureLoggedIn();
+        if (!allowed) {
+          return;
+        }
         loadScheduleData();
       });
 
@@ -463,6 +537,10 @@
 
       async function loadScheduleData(options = {}) {
         teardownSSE();
+        if (!userCanAccessView(state.user, CURRENT_VIEW)) {
+          showToast('无权访问该视图');
+          return;
+        }
         const params = new URLSearchParams();
         if (state.teamId) {
           params.set('team_id', String(state.teamId));
@@ -491,7 +569,8 @@
 
         const data = await response.json().catch(() => null);
         if (!response.ok || !data || !data.ok) {
-          showToast((data && data.error) || '加载排班失败');
+          const message = data && (data.error || data.msg);
+          showToast(message || '加载排班失败');
           return;
         }
 
@@ -1099,8 +1178,8 @@
 
           state.cells.set(key, previousCell);
           updateCellElement(cell, previousCell);
-          const message = data && data.error ? data.error : '保存失败';
-          showToast(message);
+        const message = data && (data.error || data.msg) ? (data.error || data.msg) : '保存失败';
+        showToast(message);
           return;
         }
 

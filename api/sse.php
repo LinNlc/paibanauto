@@ -4,21 +4,15 @@ declare(strict_types=1);
 
 require __DIR__ . '/_lib.php';
 
-$pdo = db();
-$user = current_user();
-if ($user === null) {
-    json_err('未登录', 401);
-}
-
-$permissions = load_user_permissions($pdo, (int) ($user['id'] ?? 0));
-if ($permissions === null || !permissions_can_view_section($permissions, 'schedule')) {
-    json_err('无权访问排班数据', 403);
-}
+$context = enforce_view_access('schedule');
+$permissions = $context['permissions'];
 
 $teamId = isset($_GET['team_id']) ? (int) $_GET['team_id'] : 0;
-if ($teamId <= 0 || !permissions_can_access_team($permissions, $teamId)) {
-    json_err('无权访问该团队', 403);
+if ($teamId <= 0) {
+    json_err('缺少有效的团队', 422);
 }
+
+ensure_team_access($permissions, $teamId);
 
 $startParam = isset($_GET['start']) ? (string) $_GET['start'] : '';
 $endParam = isset($_GET['end']) ? (string) $_GET['end'] : '';

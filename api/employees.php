@@ -6,78 +6,47 @@ require __DIR__ . '/_lib.php';
 
 $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
-$pdo = db();
-$user = current_user();
-if ($user === null) {
-    respond_error('未登录', 401);
-}
-
-$userAccess = fetch_user_access($pdo, (int) ($user['id'] ?? 0));
-if ($userAccess === null) {
-    respond_error('账号不可用', 403);
-}
-
-$isAdmin = $userAccess['role'] === 'admin';
-$allowedViews = $userAccess['allowed_views'];
-if (!$isAdmin && !in_array('people', $allowedViews, true)) {
-    respond_error('无权限访问员工数据', 403);
-}
-
-$context = [
-    'pdo' => $pdo,
-    'is_admin' => $isAdmin,
-    'allowed_team_ids' => $isAdmin ? null : $userAccess['allowed_teams'],
-    'editable_team_ids' => $isAdmin ? null : $userAccess['editable_teams'],
-];
-
 if ($method === 'GET') {
-    handle_get($context);
+    enforce_view_access('people');
+    handle_get();
     exit;
 }
 
 if ($method === 'POST') {
+    enforce_view_access('people');
     $payload = read_json_payload();
     $action = strtolower((string) ($payload['action'] ?? ''));
 
     switch ($action) {
         case 'create_many':
-            handle_create_many($context, $payload);
+            handle_create_many($payload);
             break;
         case 'update':
-            handle_update_employee($context, $payload);
+            handle_update_employee($payload);
             break;
         case 'delete':
-            handle_delete_employee($context, $payload);
+            handle_delete_employee($payload);
             break;
         case 'reorder':
-            handle_reorder($context, $payload);
+            handle_reorder($payload);
             break;
         default:
-            respond_error('未知操作', 400);
+            json_err('未知操作', 400);
     }
     exit;
 }
 
 header('Allow: GET, POST');
-respond_error('Method Not Allowed', 405);
+json_err('Method Not Allowed', 405);
 
 function respond_ok(array $data = []): void
 {
-    http_response_code(200);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(array_merge(['ok' => true], $data), JSON_UNESCAPED_UNICODE);
-    exit;
+    json_ok($data);
 }
 
 function respond_error(string $message, int $status = 400): void
 {
-    http_response_code($status);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
-        'ok' => false,
-        'msg' => $message,
-    ], JSON_UNESCAPED_UNICODE);
-    exit;
+    json_err($message, $status);
 }
 
 function read_json_payload(): array
@@ -96,78 +65,20 @@ function read_json_payload(): array
     return is_array($decoded) ? $decoded : [];
 }
 
-function fetch_user_access(PDO $pdo, int $userId): ?array
+
+function handle_get(): void
 {
-    if ($userId <= 0) {
-        return null;
-    }
-
-    $stmt = $pdo->prepare('SELECT id, role, disabled, allowed_teams_json, allowed_views_json, editable_teams_json FROM users WHERE id = :id LIMIT 1');
-    $stmt->execute([':id' => $userId]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row || (int) $row['disabled'] === 1) {
-        return null;
-    }
-
-    return [
-        'id' => (int) $row['id'],
-        'role' => (string) $row['role'],
-        'allowed_teams' => normalize_int_array(decode_json_field($row['allowed_teams_json'] ?? '[]', [])),
-        'allowed_views' => normalize_string_array(decode_json_field($row['allowed_views_json'] ?? '[]', [])),
-        'editable_teams' => normalize_int_array(decode_json_field($row['editable_teams_json'] ?? '[]', [])),
-    ];
-}
-
-function normalize_int_array($value): array
-{
-    if (!is_array($value)) {
-        return [];
-    }
-
-    $result = [];
-    foreach ($value as $item) {
-        $id = (int) $item;
-        if ($id > 0) {
-            $result[$id] = $id;
-        }
-    }
-
-    sort($result);
-
-    return array_values($result);
-}
-
-function normalize_string_array($value): array
-{
-    if (!is_array($value)) {
-        return [];
-    }
-
-    $result = [];
-    foreach ($value as $item) {
-        $str = (string) $item;
-        if ($str === '') {
-            continue;
-        }
-        if (!in_array($str, $result, true)) {
-            $result[] = $str;
-        }
-    }
-
-    return $result;
-}
-
-function handle_get(array $context): void
-{
+    $context = auth_context();
     /** @var PDO $pdo */
     $pdo = $context['pdo'];
-    $teams = fetch_accessible_teams($context);
+    $permissions = $context['permissions'];
 
-    $teamIdParam = isset($_GET['team_id']) ? (int) $_GET['team_id'] : null;
+    $teams = fetch_accessible_teams($pdo, $permissions);
     $teamIds = array_map(static fn (array $team): int => $team['id'], $teams);
 
+    $teamIdParam = isset($_GET['team_id']) ? (int) $_GET['team_id'] : null;
     if ($teamIdParam !== null && $teamIdParam > 0 && !in_array($teamIdParam, $teamIds, true)) {
-        respond_error('无权访问该团队', 403);
+        permission_denied();
     }
 
     $teamId = $teamIdParam;
@@ -176,11 +87,12 @@ function handle_get(array $context): void
     }
 
     $employees = [];
+    $canEdit = false;
     if ($teamId !== null && $teamId > 0) {
+        ensure_team_access($permissions, $teamId);
         $employees = fetch_employees_by_team($pdo, $teamId);
+        $canEdit = permissions_can_edit_team($permissions, $teamId);
     }
-
-    $canEdit = $teamId !== null && $teamId > 0 && can_edit_team($context, $teamId);
 
     respond_ok([
         'teams' => $teams,
@@ -190,16 +102,16 @@ function handle_get(array $context): void
     ]);
 }
 
-function fetch_accessible_teams(array $context): array
+function fetch_accessible_teams(PDO $pdo, array $permissions): array
 {
-    /** @var PDO $pdo */
-    $pdo = $context['pdo'];
-    $allowed = $context['allowed_team_ids'];
+    $allowed = $permissions['allowed_teams'] ?? null;
 
-    if ($context['is_admin']) {
+    if ($allowed === null) {
         $stmt = $pdo->query('SELECT id, name FROM teams ORDER BY name ASC, id ASC');
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    } elseif (is_array($allowed) && $allowed !== []) {
+    } elseif ($allowed === []) {
+        $rows = [];
+    } else {
         $placeholders = [];
         $params = [];
         foreach ($allowed as $idx => $teamId) {
@@ -211,8 +123,6 @@ function fetch_accessible_teams(array $context): array
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    } else {
-        $rows = [];
     }
 
     return array_map(static function (array $row): array {
@@ -241,16 +151,14 @@ function fetch_employees_by_team(PDO $pdo, int $teamId): array
     }, $rows);
 }
 
-function handle_create_many(array $context, array $payload): void
+function handle_create_many(array $payload): void
 {
     $teamId = isset($payload['team_id']) ? (int) $payload['team_id'] : 0;
     if ($teamId <= 0) {
         respond_error('缺少有效的团队', 422);
     }
 
-    if (!can_view_team($context, $teamId) || !can_edit_team($context, $teamId)) {
-        respond_error('无权在该团队创建员工', 403);
-    }
+    $context = enforce_edit_access($teamId);
 
     $namesRaw = isset($payload['names']) ? (string) $payload['names'] : '';
     $lines = preg_split('/\r?\n/', $namesRaw) ?: [];
@@ -297,22 +205,25 @@ function handle_create_many(array $context, array $payload): void
     respond_ok();
 }
 
-function handle_update_employee(array $context, array $payload): void
+function handle_update_employee(array $payload): void
 {
     $id = isset($payload['id']) ? (int) $payload['id'] : 0;
     if ($id <= 0) {
         respond_error('缺少员工ID', 422);
     }
 
-    $employee = fetch_employee($context, $id);
+    $baseContext = auth_context();
+    /** @var PDO $pdo */
+    $pdo = $baseContext['pdo'];
+    $employee = fetch_employee($pdo, $id);
     if ($employee === null) {
         respond_error('员工不存在', 404);
     }
 
     $teamId = (int) $employee['team_id'];
-    if (!can_view_team($context, $teamId) || !can_edit_team($context, $teamId)) {
-        respond_error('无权修改该员工', 403);
-    }
+    $context = enforce_edit_access($teamId);
+    /** @var PDO $pdo */
+    $pdo = $context['pdo'];
 
     $fields = [];
     $params = [':id' => $id];
@@ -348,8 +259,6 @@ function handle_update_employee(array $context, array $payload): void
         respond_error('没有可更新的字段', 422);
     }
 
-    /** @var PDO $pdo */
-    $pdo = $context['pdo'];
     $sql = 'UPDATE employees SET ' . implode(', ', $fields) . ' WHERE id = :id';
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
@@ -357,25 +266,26 @@ function handle_update_employee(array $context, array $payload): void
     respond_ok();
 }
 
-function handle_delete_employee(array $context, array $payload): void
+function handle_delete_employee(array $payload): void
 {
     $id = isset($payload['id']) ? (int) $payload['id'] : 0;
     if ($id <= 0) {
         respond_error('缺少员工ID', 422);
     }
 
-    $employee = fetch_employee($context, $id);
+    $baseContext = auth_context();
+    /** @var PDO $pdo */
+    $pdo = $baseContext['pdo'];
+    $employee = fetch_employee($pdo, $id);
     if ($employee === null) {
         respond_error('员工不存在', 404);
     }
 
     $teamId = (int) $employee['team_id'];
-    if (!can_view_team($context, $teamId) || !can_edit_team($context, $teamId)) {
-        respond_error('无权删除该员工', 403);
-    }
-
+    $context = enforce_edit_access($teamId);
     /** @var PDO $pdo */
     $pdo = $context['pdo'];
+
     $stmt = $pdo->prepare('DELETE FROM employees WHERE id = :id');
     $stmt->execute([':id' => $id]);
 
@@ -386,16 +296,16 @@ function handle_delete_employee(array $context, array $payload): void
     respond_ok();
 }
 
-function handle_reorder(array $context, array $payload): void
+function handle_reorder(array $payload): void
 {
     $teamId = isset($payload['team_id']) ? (int) $payload['team_id'] : 0;
     if ($teamId <= 0) {
         respond_error('缺少有效的团队', 422);
     }
 
-    if (!can_view_team($context, $teamId) || !can_edit_team($context, $teamId)) {
-        respond_error('无权排序该团队员工', 403);
-    }
+    $context = enforce_edit_access($teamId);
+    /** @var PDO $pdo */
+    $pdo = $context['pdo'];
 
     $order = $payload['order'] ?? [];
     if (!is_array($order) || $order === []) {
@@ -418,7 +328,7 @@ function handle_reorder(array $context, array $payload): void
         respond_error('排序数据包含重复员工', 422);
     }
 
-    $existing = fetch_employees_by_team($context['pdo'], $teamId);
+    $existing = fetch_employees_by_team($pdo, $teamId);
     $existingIds = array_map(static fn (array $emp): int => $emp['id'], $existing);
 
     $missing = array_diff($existingIds, $ids);
@@ -431,7 +341,6 @@ function handle_reorder(array $context, array $payload): void
         respond_error('排序数据包含无效员工', 422);
     }
 
-    $pdo = $context['pdo'];
     $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare('UPDATE employees SET sort_order = :sort_order WHERE id = :id');
@@ -452,10 +361,8 @@ function handle_reorder(array $context, array $payload): void
     respond_ok();
 }
 
-function fetch_employee(array $context, int $id): ?array
+function fetch_employee(PDO $pdo, int $id): ?array
 {
-    /** @var PDO $pdo */
-    $pdo = $context['pdo'];
     $stmt = $pdo->prepare('SELECT id, team_id, name, display_name, active, sort_order FROM employees WHERE id = :id LIMIT 1');
     $stmt->execute([':id' => $id]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -473,30 +380,3 @@ function fetch_employee(array $context, int $id): ?array
     ];
 }
 
-function can_view_team(array $context, int $teamId): bool
-{
-    if ($context['is_admin']) {
-        return true;
-    }
-
-    $allowed = $context['allowed_team_ids'];
-    if (!is_array($allowed) || $allowed === []) {
-        return false;
-    }
-
-    return in_array($teamId, $allowed, true);
-}
-
-function can_edit_team(array $context, int $teamId): bool
-{
-    if ($context['is_admin']) {
-        return true;
-    }
-
-    $editable = $context['editable_team_ids'];
-    if (!is_array($editable) || $editable === []) {
-        return false;
-    }
-
-    return in_array($teamId, $editable, true);
-}

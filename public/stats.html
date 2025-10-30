@@ -17,10 +17,10 @@
         <div class="site-logo">排班助手</div>
         <nav>
           <a href="/public/index.html">仪表盘</a>
-          <a href="/public/people.html">人员管理</a>
-          <a href="/public/schedule.html">排班表</a>
-          <a href="/public/stats.html" class="opacity-100">数据统计</a>
-          <a href="/admin/index.html">后台管理</a>
+          <a href="/public/people.html" data-view="people">人员管理</a>
+          <a href="/public/schedule.html" data-view="schedule">排班表</a>
+          <a href="/public/stats.html" class="opacity-100" data-view="stats">数据统计</a>
+          <a href="/admin/index.html" data-view="admin">后台管理</a>
         </nav>
       </aside>
       <main class="site-content space-y-6 pb-12">
@@ -194,6 +194,43 @@
         isLoading: false,
       };
 
+      const CURRENT_VIEW = 'stats';
+
+      function normalizeViewList(list) {
+        if (!Array.isArray(list)) {
+          return [];
+        }
+        return list.map((item) => String(item).toLowerCase());
+      }
+
+      function userCanAccessView(user, view) {
+        if (!view) return true;
+        if (!user) return false;
+        const normalizedView = String(view).toLowerCase();
+        if (normalizedView === 'admin' && String(user.role || '').toLowerCase() !== 'admin') {
+          return false;
+        }
+        const allowedViews = normalizeViewList(user.allowed_views);
+        if (allowedViews.includes('*')) {
+          return true;
+        }
+        return allowedViews.includes(normalizedView);
+      }
+
+      function applyViewVisibility(user) {
+        document.querySelectorAll('[data-view]').forEach((link) => {
+          const requiredView = link.dataset.view ? link.dataset.view.toLowerCase() : '';
+          if (!requiredView) {
+            return;
+          }
+          if (userCanAccessView(user, requiredView)) {
+            link.classList.remove('hidden');
+          } else {
+            link.classList.add('hidden');
+          }
+        });
+      }
+
       const teamSelect = document.getElementById('team-select');
       const startInput = document.getElementById('start-date');
       const endInput = document.getElementById('end-date');
@@ -229,7 +266,10 @@
       });
 
       async function init() {
-        await ensureLoggedIn();
+        const allowed = await ensureLoggedIn();
+        if (!allowed) {
+          return;
+        }
         await loadPersonStats(true);
       }
 
@@ -241,17 +281,27 @@
           });
           if (!response.ok) {
             window.location.href = '/public/login.html';
-            return;
+            return false;
           }
           const data = await response.json().catch(() => null);
           if (!data || !data.ok || !data.user) {
             window.location.href = '/public/login.html';
-            return;
+            return false;
           }
           state.user = data.user;
           document.getElementById('user-name').textContent = data.user.display_name || '';
+          applyViewVisibility(state.user);
+          if (!userCanAccessView(state.user, CURRENT_VIEW)) {
+            showToast('无权访问该视图');
+            setTimeout(() => {
+              window.location.href = '/public/index.html';
+            }, 800);
+            return false;
+          }
+          return true;
         } catch (error) {
           window.location.href = '/public/login.html';
+          return false;
         }
       }
 
@@ -273,6 +323,10 @@
       }
 
       async function loadPersonStats(force = false) {
+        if (!userCanAccessView(state.user, CURRENT_VIEW)) {
+          showToast('无权访问该视图');
+          return;
+        }
         if (state.isLoading && !force) return;
         state.isLoading = true;
         try {
@@ -291,7 +345,8 @@
           }
           const data = await response.json().catch(() => null);
           if (!response.ok || !data || !data.ok) {
-            showToast((data && data.error) || '加载统计数据失败');
+            const message = data && (data.error || data.msg);
+            showToast(message || '加载统计数据失败');
             return;
           }
           state.teams = Array.isArray(data.teams) ? data.teams : [];
@@ -348,7 +403,8 @@
           }
           const data = await response.json().catch(() => null);
           if (!response.ok || !data || !data.ok) {
-            showToast((data && data.error) || '加载在岗数据失败');
+            const message = data && (data.error || data.msg);
+            showToast(message || '加载在岗数据失败');
             return;
           }
           state.coverageDaily = Array.isArray(data.daily) ? data.daily : [];

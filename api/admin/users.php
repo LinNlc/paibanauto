@@ -73,6 +73,7 @@ function handle_create_user(array $payload): void
     $allowedTeams = normalize_team_ids($payload['allowed_teams'] ?? []);
     $editableTeams = normalize_team_ids($payload['editable_teams'] ?? []);
     $allowedViews = normalize_views($payload['allowed_views'] ?? []);
+    $allowedViews = adjust_allowed_views_by_role($role, $allowedViews);
     $disabled = normalize_bool($payload['disabled'] ?? false);
 
     $pdo = db();
@@ -109,7 +110,9 @@ function handle_update_user(array $payload): void
     }
 
     // Ensure user exists before updating to differentiate between no-change and missing record
-    fetch_user_by_id($id);
+    $existingUser = fetch_user_by_id($id);
+    $existingRole = strtolower((string) ($existingUser['role'] ?? 'editor'));
+    $targetRole = $existingRole;
 
     $fields = [];
     $params = [':id' => $id];
@@ -139,6 +142,7 @@ function handle_update_user(array $payload): void
         }
         $fields[] = 'role = :role';
         $params[':role'] = $role;
+        $targetRole = $role;
     }
 
     if (array_key_exists('allowed_teams', $payload)) {
@@ -155,8 +159,15 @@ function handle_update_user(array $payload): void
 
     if (array_key_exists('allowed_views', $payload)) {
         $allowedViews = normalize_views($payload['allowed_views']);
+        $allowedViews = adjust_allowed_views_by_role($targetRole, $allowedViews);
         $fields[] = 'allowed_views_json = :allowed_views';
         $params[':allowed_views'] = encode_json_field($allowedViews);
+    }
+
+    if (!array_key_exists('allowed_views', $payload) && $targetRole !== $existingRole) {
+        $adjustedViews = adjust_allowed_views_by_role($targetRole, $existingUser['allowed_views'] ?? []);
+        $fields[] = 'allowed_views_json = :allowed_views';
+        $params[':allowed_views'] = encode_json_field($adjustedViews);
     }
 
     if (array_key_exists('disabled', $payload)) {
@@ -249,12 +260,14 @@ function format_user_row(array $row): array
     $allowedTeams = normalize_team_ids(decode_json_field($row['allowed_teams_json'] ?? '[]', []));
     $editableTeams = normalize_team_ids(decode_json_field($row['editable_teams_json'] ?? '[]', []));
     $allowedViews = normalize_views(decode_json_field($row['allowed_views_json'] ?? '[]', []));
+    $role = (string) $row['role'];
+    $allowedViews = adjust_allowed_views_by_role($role, $allowedViews);
 
     return [
         'id' => (int) $row['id'],
         'username' => (string) $row['username'],
         'display_name' => (string) $row['display_name'],
-        'role' => (string) $row['role'],
+        'role' => $role,
         'allowed_teams' => $allowedTeams,
         'editable_teams' => $editableTeams,
         'allowed_views' => $allowedViews,
@@ -284,7 +297,7 @@ function normalize_team_ids($value): array
 
 function normalize_views($value): array
 {
-    $allowed = ['people', 'schedule', 'stats'];
+    $allowed = ['people', 'schedule', 'stats', 'admin'];
     if (!is_array($value)) {
         return [];
     }
@@ -298,6 +311,29 @@ function normalize_views($value): array
     }
 
     return $result;
+}
+
+function adjust_allowed_views_by_role(string $role, array $views): array
+{
+    $normalizedRole = strtolower($role);
+    $unique = [];
+    foreach ($views as $view) {
+        $viewKey = strtolower((string) $view);
+        if ($viewKey === '') {
+            continue;
+        }
+        if (!isset($unique[$viewKey])) {
+            $unique[$viewKey] = $viewKey;
+        }
+    }
+
+    if ($normalizedRole === 'admin') {
+        $unique['admin'] = 'admin';
+    } else {
+        unset($unique['admin']);
+    }
+
+    return array_values($unique);
 }
 
 function normalize_bool($value): bool

@@ -185,6 +185,7 @@
         { value: 'people', label: '人员' },
         { value: 'schedule', label: '排班' },
         { value: 'stats', label: '统计' },
+        { value: 'admin', label: '后台' },
       ];
 
       const tabButtons = document.querySelectorAll('.tab-button');
@@ -256,24 +257,42 @@
         });
       }
 
+      function parseJsonResponse(response, fallbackError) {
+        if (response.status === 401) {
+          window.location.href = '/public/login.html';
+          throw new Error('UNAUTHENTICATED');
+        }
+
+        return response
+          .text()
+          .then((text) => {
+            if (!text) {
+              return null;
+            }
+            try {
+              return JSON.parse(text);
+            } catch (err) {
+              throw new Error('服务器返回无效数据');
+            }
+          })
+          .then((data) => {
+            if (response.status === 403) {
+              throw new Error('FORBIDDEN');
+            }
+            if (!response.ok || !data || data.ok !== true) {
+              const message = data && (data.error || data.msg);
+              throw new Error(message || fallbackError);
+            }
+            return data;
+          });
+      }
+
       async function apiGet(url) {
         const response = await fetch(url, {
           method: 'GET',
           credentials: 'include',
         });
-        const text = await response.text();
-        let data = null;
-        if (text) {
-          try {
-            data = JSON.parse(text);
-          } catch (err) {
-            throw new Error('服务器返回无效数据');
-          }
-        }
-        if (!response.ok || !data || data.ok !== true) {
-          throw new Error((data && data.error) || '请求失败');
-        }
-        return data;
+        return parseJsonResponse(response, '请求失败');
       }
 
       async function apiPost(url, payload) {
@@ -285,19 +304,7 @@
           },
           body: JSON.stringify(payload),
         });
-        const text = await response.text();
-        let data = null;
-        if (text) {
-          try {
-            data = JSON.parse(text);
-          } catch (err) {
-            throw new Error('服务器返回无效数据');
-          }
-        }
-        if (!response.ok || !data || data.ok !== true) {
-          throw new Error((data && data.error) || '操作失败');
-        }
-        return data;
+        return parseJsonResponse(response, '操作失败');
       }
 
       function resetTeamForm() {
@@ -498,7 +505,13 @@
         try {
           const meResp = await apiGet('/api/auth.php?action=me');
           if (!meResp.user || meResp.user.role !== 'admin') {
-            throw new Error('权限不足');
+            throw new Error('FORBIDDEN');
+          }
+          const allowedViews = Array.isArray(meResp.user.allowed_views)
+            ? meResp.user.allowed_views.map((view) => String(view).toLowerCase())
+            : [];
+          if (!allowedViews.includes('*') && !allowedViews.includes('admin')) {
+            throw new Error('FORBIDDEN');
           }
           state.me = meResp.user;
           document.getElementById('admin-shell').classList.remove('hidden');
@@ -519,6 +532,9 @@
           resetTeamForm();
           resetUserForm();
         } catch (error) {
+          if (error && error.message === 'UNAUTHENTICATED') {
+            return;
+          }
           document.getElementById('admin-shell').classList.add('hidden');
           document.getElementById('access-denied').classList.remove('hidden');
           console.error(error);
