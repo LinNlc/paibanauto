@@ -9,4 +9,5 @@ return [
     'site_name' => '排班助手',
     'sse_keepalive_sec' => 15,
     'password_cost' => 12,
+    'target_white_per_month' => 8,
 ];
