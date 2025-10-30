@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>排班助手 - 人员管理</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/public/css/app.css" />
+    <style>
+      .dragging {
+        opacity: 0.5;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-950 text-slate-100">
+    <div class="site-shell">
+      <aside class="site-sidebar">
+        <div class="site-logo">排班助手</div>
+        <nav>
+          <a href="/public/index.html">仪表盘</a>
+          <a href="/public/people.html" class="opacity-100">人员管理</a>
+          <a href="/admin/index.html">后台管理</a>
+        </nav>
+      </aside>
+      <main class="site-content space-y-6">
+        <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 class="text-3xl font-semibold tracking-wide">人员管理</h1>
+            <p class="text-slate-400 text-sm">维护各团队成员，支持批量新增、排序与激活状态调整。</p>
+          </div>
+          <div class="text-sm text-slate-400">当前用户：<span id="user-name" class="text-slate-200"></span></div>
+        </header>
+
+        <section class="bg-slate-900/60 border border-slate-800/60 rounded-3xl p-6 shadow-xl space-y-4">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex flex-col gap-2 w-full max-w-xs">
+              <label for="team-select" class="text-sm text-slate-400">选择团队</label>
+              <select
+                id="team-select"
+                class="w-full rounded-xl bg-slate-950/70 border border-slate-800 px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              ></select>
+            </div>
+            <div class="flex flex-wrap gap-3">
+              <button
+                id="bulk-add-btn"
+                type="button"
+                class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                批量新增
+              </button>
+              <button
+                id="refresh-btn"
+                type="button"
+                class="px-4 py-2 rounded-xl border border-slate-700/70 text-slate-300 hover:bg-slate-800/80 transition"
+              >
+                刷新
+              </button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-800/70">
+              <thead>
+                <tr class="text-left text-xs uppercase tracking-wider text-slate-400">
+                  <th class="px-4 py-3 w-12"></th>
+                  <th class="px-4 py-3">姓名</th>
+                  <th class="px-4 py-3">显示名</th>
+                  <th class="px-4 py-3 w-28">启用</th>
+                  <th class="px-4 py-3 w-24 text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody id="employee-body" class="divide-y divide-slate-800/60"></tbody>
+            </table>
+          </div>
+          <p id="empty-hint" class="text-sm text-slate-500 hidden">暂无员工，请先批量新增或手动创建。</p>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="fixed top-6 inset-x-0 flex justify-center pointer-events-none z-50"></div>
+
+    <div
+      id="bulk-modal"
+      class="hidden fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center px-4"
+      aria-hidden="true"
+    >
+      <div class="max-w-lg w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5 shadow-2xl">
+        <div class="space-y-1">
+          <h2 class="text-xl font-semibold">批量新增员工</h2>
+          <p class="text-sm text-slate-400">每行一个姓名，显示名将与姓名保持一致。</p>
+        </div>
+        <form id="bulk-form" class="space-y-4">
+          <textarea
+            id="bulk-names"
+            rows="8"
+            class="w-full rounded-xl bg-slate-950/70 border border-slate-800 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            placeholder="张三\n李四\n王五"
+          ></textarea>
+          <div class="flex justify-end gap-3">
+            <button
+              type="button"
+              id="bulk-cancel"
+              class="px-4 py-2 rounded-xl border border-slate-700/60 text-slate-300 hover:bg-slate-800/70"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white"
+            >
+              提交
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      const state = {
+        user: null,
+        teams: [],
+        teamId: null,
+        employees: [],
+        canEdit: false,
+        isLoading: false,
+      };
+
+      const toastEl = document.getElementById('toast');
+      const teamSelect = document.getElementById('team-select');
+      const employeeBody = document.getElementById('employee-body');
+      const emptyHint = document.getElementById('empty-hint');
+      const bulkModal = document.getElementById('bulk-modal');
+      const bulkNames = document.getElementById('bulk-names');
+      const bulkForm = document.getElementById('bulk-form');
+      const bulkCancel = document.getElementById('bulk-cancel');
+      const bulkAddBtn = document.getElementById('bulk-add-btn');
+      const refreshBtn = document.getElementById('refresh-btn');
+
+      document.addEventListener('DOMContentLoaded', async () => {
+        await ensureLoggedIn();
+        await loadTeamData();
+      });
+
+      teamSelect.addEventListener('change', async (event) => {
+        const value = parseInt(event.target.value, 10);
+        state.teamId = Number.isFinite(value) ? value : null;
+        await loadTeamData(state.teamId);
+      });
+
+      bulkAddBtn.addEventListener('click', () => {
+        if (!state.canEdit || !state.teamId) {
+          showToast('当前不可批量新增', 'error');
+          return;
+        }
+        bulkNames.value = '';
+        bulkModal.classList.remove('hidden');
+        bulkNames.focus();
+      });
+
+      refreshBtn.addEventListener('click', async () => {
+        await loadTeamData(state.teamId);
+        showToast('已刷新最新数据', 'success');
+      });
+
+      bulkCancel.addEventListener('click', closeBulkModal);
+      bulkModal.addEventListener('click', (event) => {
+        if (event.target === bulkModal) {
+          closeBulkModal();
+        }
+      });
+
+      bulkForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!state.canEdit || !state.teamId) {
+          showToast('无权执行批量新增', 'error');
+          return;
+        }
+        const names = bulkNames.value || '';
+        if (!names.trim()) {
+          showToast('请输入至少一个姓名');
+          return;
+        }
+        const ok = await postEmployees({
+          action: 'create_many',
+          team_id: state.teamId,
+          names,
+        });
+        if (ok) {
+          closeBulkModal();
+          showToast('批量新增成功', 'success');
+          await loadTeamData(state.teamId);
+        }
+      });
+
+      function closeBulkModal() {
+        bulkModal.classList.add('hidden');
+      }
+
+      async function ensureLoggedIn() {
+        try {
+          const response = await fetch('/api/auth.php?action=me', {
+            method: 'GET',
+            credentials: 'include',
+          });
+          if (!response.ok) {
+            window.location.href = '/public/login.html';
+            return;
+          }
+          const data = await response.json();
+          if (!data || !data.ok || !data.user) {
+            window.location.href = '/public/login.html';
+            return;
+          }
+          state.user = data.user;
+          document.getElementById('user-name').textContent = data.user.display_name || '';
+        } catch (error) {
+          window.location.href = '/public/login.html';
+        }
+      }
+
+      async function loadTeamData(teamId = null) {
+        if (state.isLoading) return;
+        state.isLoading = true;
+        try {
+          const params = teamId ? `?team_id=${encodeURIComponent(teamId)}` : '';
+          const response = await fetch(`/api/employees.php${params}`, {
+            method: 'GET',
+            credentials: 'include',
+          });
+          if (response.status === 401) {
+            window.location.href = '/public/login.html';
+            return;
+          }
+          const data = await response.json().catch(() => null);
+          if (!response.ok || !data || !data.ok) {
+            showToast((data && data.msg) || '加载员工数据失败');
+            return;
+          }
+          state.teams = Array.isArray(data.teams) ? data.teams : [];
+          state.teamId = data.team_id || null;
+          state.employees = Array.isArray(data.employees) ? data.employees : [];
+          state.canEdit = Boolean(data.can_edit);
+          renderTeams();
+          renderEmployees();
+        } catch (error) {
+          showToast('网络异常，请稍后再试');
+        } finally {
+          state.isLoading = false;
+        }
+      }
+
+      function renderTeams() {
+        teamSelect.innerHTML = '';
+        if (!state.teams.length) {
+          const option = document.createElement('option');
+          option.textContent = '暂无可访问团队';
+          option.disabled = true;
+          option.selected = true;
+          teamSelect.appendChild(option);
+          teamSelect.disabled = true;
+          bulkAddBtn.disabled = true;
+          return;
+        }
+        state.teams.forEach((team) => {
+          const option = document.createElement('option');
+          option.value = team.id;
+          option.textContent = team.name;
+          if (team.id === state.teamId) {
+            option.selected = true;
+          }
+          teamSelect.appendChild(option);
+        });
+        teamSelect.disabled = false;
+        bulkAddBtn.disabled = !state.canEdit;
+      }
+
+      function renderEmployees() {
+        employeeBody.innerHTML = '';
+        if (!state.employees.length) {
+          emptyHint.classList.remove('hidden');
+          return;
+        }
+        emptyHint.classList.add('hidden');
+
+        state.employees.forEach((employee) => {
+          const tr = document.createElement('tr');
+          tr.dataset.id = employee.id;
+          tr.draggable = state.canEdit;
+          tr.className = 'transition hover:bg-slate-800/40';
+
+          const handleTd = document.createElement('td');
+          handleTd.className = 'px-4 py-3 text-slate-500';
+          const handle = document.createElement('button');
+          handle.type = 'button';
+          handle.className = 'cursor-move text-lg disabled:cursor-default';
+          handle.innerHTML = '&#8942;';
+          handle.disabled = !state.canEdit;
+          handleTd.appendChild(handle);
+
+          const nameTd = document.createElement('td');
+          nameTd.className = 'px-4 py-3';
+          const nameInput = document.createElement('input');
+          nameInput.type = 'text';
+          nameInput.value = employee.name;
+          nameInput.dataset.originalValue = employee.name;
+          nameInput.dataset.id = employee.id;
+          nameInput.className = 'w-full rounded-lg bg-slate-950/60 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-60';
+          nameInput.disabled = !state.canEdit;
+          nameInput.addEventListener('blur', () => handleFieldUpdate(employee.id, nameInput, 'name'));
+          nameTd.appendChild(nameInput);
+
+          const displayTd = document.createElement('td');
+          displayTd.className = 'px-4 py-3';
+          const displayInput = document.createElement('input');
+          displayInput.type = 'text';
+          displayInput.value = employee.display_name;
+          displayInput.dataset.originalValue = employee.display_name;
+          displayInput.dataset.id = employee.id;
+          displayInput.className = 'w-full rounded-lg bg-slate-950/60 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-60';
+          displayInput.disabled = !state.canEdit;
+          displayInput.addEventListener('blur', () => handleFieldUpdate(employee.id, displayInput, 'display_name'));
+          displayTd.appendChild(displayInput);
+
+          const activeTd = document.createElement('td');
+          activeTd.className = 'px-4 py-3';
+          const toggle = document.createElement('label');
+          toggle.className = 'inline-flex items-center gap-2';
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.checked = Boolean(employee.active);
+          checkbox.disabled = !state.canEdit;
+          checkbox.addEventListener('change', () => handleToggle(employee.id, checkbox.checked));
+          const toggleText = document.createElement('span');
+          toggleText.textContent = checkbox.checked ? '启用' : '停用';
+          checkbox.addEventListener('change', () => {
+            toggleText.textContent = checkbox.checked ? '启用' : '停用';
+          });
+          toggle.appendChild(checkbox);
+          toggle.appendChild(toggleText);
+          activeTd.appendChild(toggle);
+
+          const actionTd = document.createElement('td');
+          actionTd.className = 'px-4 py-3 text-right';
+          if (state.canEdit) {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'px-3 py-1.5 text-sm rounded-lg bg-rose-500/80 hover:bg-rose-500 text-white';
+            deleteBtn.textContent = '删除';
+            deleteBtn.addEventListener('click', () => handleDelete(employee.id));
+            actionTd.appendChild(deleteBtn);
+          }
+
+          tr.appendChild(handleTd);
+          tr.appendChild(nameTd);
+          tr.appendChild(displayTd);
+          tr.appendChild(activeTd);
+          tr.appendChild(actionTd);
+
+          if (state.canEdit) {
+            tr.addEventListener('dragstart', onDragStart);
+            tr.addEventListener('dragover', onDragOver);
+            tr.addEventListener('drop', onDrop);
+            tr.addEventListener('dragend', onDragEnd);
+          }
+
+          employeeBody.appendChild(tr);
+        });
+      }
+
+      function onDragStart(event) {
+        event.dataTransfer.effectAllowed = 'move';
+        event.currentTarget.classList.add('dragging');
+      }
+
+      function onDragOver(event) {
+        event.preventDefault();
+        const dragging = employeeBody.querySelector('.dragging');
+        const target = event.currentTarget;
+        if (!dragging || dragging === target) return;
+        const rows = Array.from(employeeBody.querySelectorAll('tr'));
+        const draggingIndex = rows.indexOf(dragging);
+        const targetIndex = rows.indexOf(target);
+        if (draggingIndex < targetIndex) {
+          target.after(dragging);
+        } else {
+          target.before(dragging);
+        }
+      }
+
+      async function onDrop(event) {
+        event.preventDefault();
+        const dragging = employeeBody.querySelector('.dragging');
+        if (!dragging) {
+          return;
+        }
+        dragging.classList.remove('dragging');
+        await submitReorder();
+      }
+
+      function onDragEnd(event) {
+        event.currentTarget.classList.remove('dragging');
+      }
+
+      async function submitReorder() {
+        if (!state.canEdit || !state.teamId) {
+          return;
+        }
+        const ids = Array.from(employeeBody.querySelectorAll('tr')).map((row) => parseInt(row.dataset.id, 10));
+        if (!ids.length) {
+          return;
+        }
+        const ok = await postEmployees({
+          action: 'reorder',
+          team_id: state.teamId,
+          order: ids,
+        });
+        if (ok) {
+          showToast('排序已更新', 'success');
+          await loadTeamData(state.teamId);
+        }
+      }
+
+      async function handleFieldUpdate(id, input, field) {
+        if (!state.canEdit) return;
+        const value = (input.value || '').trim();
+        if (value === (input.dataset.originalValue || '').trim()) {
+          return;
+        }
+        if (!value) {
+          showToast('内容不能为空');
+          input.value = input.dataset.originalValue || '';
+          return;
+        }
+        const payload = { action: 'update', id };
+        payload[field] = value;
+        const ok = await postEmployees(payload);
+        if (ok) {
+          input.dataset.originalValue = value;
+          showToast('已保存修改', 'success');
+        } else {
+          await loadTeamData(state.teamId);
+        }
+      }
+
+      async function handleToggle(id, active) {
+        if (!state.canEdit) return;
+        const ok = await postEmployees({ action: 'update', id, active });
+        if (ok) {
+          showToast(active ? '已启用员工' : '已停用员工', 'success');
+        } else {
+          await loadTeamData(state.teamId);
+        }
+      }
+
+      async function handleDelete(id) {
+        if (!state.canEdit) return;
+        if (!confirm('确定删除该员工吗？')) {
+          return;
+        }
+        const ok = await postEmployees({ action: 'delete', id });
+        if (ok) {
+          showToast('员工已删除', 'success');
+          await loadTeamData(state.teamId);
+        }
+      }
+
+      async function postEmployees(body) {
+        try {
+          const response = await fetch('/api/employees.php', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          const data = await response.json().catch(() => null);
+          if (!response.ok || !data || !data.ok) {
+            showToast((data && data.msg) || '操作失败，请稍后再试');
+            return false;
+          }
+          return true;
+        } catch (error) {
+          showToast('网络异常，请稍后再试');
+          return false;
+        }
+      }
+
+      function showToast(message, type = 'error') {
+        if (!message) return;
+        toastEl.innerHTML = '';
+        const wrapper = document.createElement('div');
+        wrapper.className = `pointer-events-auto px-4 py-2 rounded-xl shadow-lg text-sm font-medium ${
+          type === 'success' ? 'bg-emerald-500/90 text-white' : 'bg-rose-500/90 text-white'
+        }`;
+        wrapper.textContent = message;
+        toastEl.appendChild(wrapper);
+        setTimeout(() => {
+          wrapper.classList.add('opacity-0', 'transition', 'duration-300');
+          setTimeout(() => wrapper.remove(), 300);
+        }, 2800);
+      }
+    </script>
+  </body>
+</html>
