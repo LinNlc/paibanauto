@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>排班助手 - 数据统计</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/public/app.css" />
+    <script src="/public/app.js"></script>
+  </head>
+  <body>
+    <button type="button" class="app-sidebar-toggle" data-sidebar-toggle aria-label="展开菜单">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <div class="sidebar-inner">
+          <div class="sidebar-header">排班助手</div>
+          <nav>
+            <a href="/public/index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
+            <a href="/public/people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
+            <a href="/public/schedule.html" data-view="schedule"><span class="nav-indicator"></span>排班表</a>
+            <a href="/public/stats.html" data-view="stats" class="is-active"><span class="nav-indicator"></span>数据统计</a>
+            <a href="/admin/index.html" data-view="admin"><span class="nav-indicator"></span>后台管理</a>
+          </nav>
+        </div>
+      </aside>
+      <main class="app-main space-y-8 pb-12">
+        <header class="app-header">
+          <div class="header-topline">
+            <div>
+              <div class="inline-flex items-center gap-2 text-sm text-slate-400">
+                <span class="px-3 py-1 rounded-full border border-slate-700/60 bg-slate-900/70">统计分析</span>
+                <span class="hidden sm:inline">班次与在岗情况</span>
+              </div>
+              <h1 class="header-title mt-2">数据统计</h1>
+              <p class="header-subtitle">查看班次分布与人员在岗概况，辅助排班优化。</p>
+            </div>
+            <div class="text-sm text-slate-400">当前用户：<span id="user-name" class="text-slate-200 font-medium"></span></div>
+          </div>
+          <div class="app-toolbar">
+            <div class="toolbar-controls flex-wrap gap-4">
+              <div class="toolbar-group min-w-[160px]">
+                <label for="team-select">选择团队</label>
+                <select id="team-select" class="select-input"></select>
+              </div>
+              <div class="toolbar-group">
+                <label for="start-date">起始日期</label>
+                <input id="start-date" type="date" class="select-input" />
+              </div>
+              <div class="toolbar-group">
+                <label for="end-date">结束日期</label>
+                <input id="end-date" type="date" class="select-input" />
+              </div>
+              <div class="toolbar-group">
+                <label>白班目标</label>
+                <span id="white-target" class="px-3 py-2 rounded-xl border border-slate-700/60 bg-slate-900/70 text-sm">-</span>
+              </div>
+            </div>
+            <div class="toolbar-controls gap-3">
+              <button id="apply-range" type="button" class="btn-primary">应用筛选</button>
+              <button id="refresh-btn" type="button" class="btn-secondary">刷新</button>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-3 text-sm text-slate-300">
+            <span id="range-info" class="px-3 py-1.5 rounded-full border border-slate-800/60 bg-slate-900/70"></span>
+            <span id="team-info" class="px-3 py-1.5 rounded-full border border-slate-800/60 bg-slate-900/70"></span>
+          </div>
+        </header>
+
+        <section class="bg-slate-900/60 border border-slate-800/60 rounded-3xl p-6 shadow-2xl space-y-6">
+          <div class="flex flex-wrap gap-3">
+            <button
+              id="tab-person"
+              type="button"
+              class="px-4 py-2 rounded-xl border border-slate-700/70 bg-slate-900/70 text-slate-200"
+            >
+              人员视图
+            </button>
+            <button
+              id="tab-coverage"
+              type="button"
+              class="px-4 py-2 rounded-xl border border-transparent text-slate-300 hover:border-slate-700/70 hover:bg-slate-800/60"
+            >
+              在岗分析
+            </button>
+          </div>
+
+          <div id="person-container" class="space-y-4">
+            <div class="overflow-x-auto rounded-2xl border border-slate-800/70">
+              <table class="min-w-full divide-y divide-slate-800/80">
+                <thead class="text-xs uppercase tracking-wider text-slate-400">
+                  <tr>
+                    <th class="px-4 py-3 text-left">姓名</th>
+                    <th class="px-4 py-3 text-left">显示名</th>
+                    <th class="px-4 py-3 text-center">启用</th>
+                    <th class="px-4 py-3 text-right">在岗天数</th>
+                    <th class="px-4 py-3 text-right">白班</th>
+                    <th class="px-4 py-3 text-right">中1</th>
+                    <th class="px-4 py-3 text-right">中2</th>
+                    <th class="px-4 py-3 text-right">夜班</th>
+                    <th class="px-4 py-3 text-right">休息</th>
+                    <th class="px-4 py-3 text-right">月均白</th>
+                    <th class="px-4 py-3 text-right">月均中1</th>
+                    <th class="px-4 py-3 text-right">月均中2</th>
+                    <th class="px-4 py-3 text-right">月均夜</th>
+                    <th class="px-4 py-3 text-right">白班差值</th>
+                  </tr>
+                </thead>
+                <tbody id="person-table" class="divide-y divide-slate-800/60"></tbody>
+              </table>
+            </div>
+            <p id="person-empty" class="text-sm text-slate-500 hidden">暂无数据，请先调整筛选条件。</p>
+          </div>
+
+          <div id="coverage-container" class="space-y-6 hidden">
+            <div class="grid gap-6 lg:grid-cols-3">
+              <div class="lg:col-span-2 h-80">
+                <canvas id="coverage-chart" class="w-full h-full"></canvas>
+              </div>
+              <div class="flex flex-col gap-3 text-sm text-slate-300 bg-slate-900/70 border border-slate-800/70 rounded-2xl p-4">
+                <h3 class="text-base font-semibold text-slate-100">视图说明</h3>
+                <p>柱状图展示不同班次的每日人数分布，折线表示在岗总人数。</p>
+                <p>切换日期或团队后自动更新，可用于观测班次均衡情况。</p>
+              </div>
+            </div>
+            <div class="overflow-x-auto rounded-2xl border border-slate-800/70">
+              <table class="min-w-full divide-y divide-slate-800/80">
+                <thead class="text-xs uppercase tracking-wider text-slate-400">
+                  <tr>
+                    <th class="px-4 py-3 text-left">日期</th>
+                    <th class="px-4 py-3 text-left">星期</th>
+                    <th class="px-4 py-3 text-right">在岗</th>
+                    <th class="px-4 py-3 text-right">白班</th>
+                    <th class="px-4 py-3 text-right">中1</th>
+                    <th class="px-4 py-3 text-right">中2</th>
+                    <th class="px-4 py-3 text-right">夜班</th>
+                  </tr>
+                </thead>
+                <tbody id="coverage-table" class="divide-y divide-slate-800/60"></tbody>
+              </table>
+            </div>
+            <p id="coverage-empty" class="text-sm text-slate-500 hidden">暂无在岗数据。</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const state = {
+        user: null,
+        teams: [],
+        teamId: null,
+        start: '',
+        end: '',
+        rangeDays: 0,
+        monthFactor: 1,
+        shiftOptions: [],
+        targetWhite: 8,
+        personRecords: [],
+        coverageDaily: [],
+        activeTab: 'person',
+        chart: null,
+        coverageKey: '',
+        isLoading: false,
+      };
+
+      const CURRENT_VIEW = 'stats';
+
+      function normalizeViewList(list) {
+        if (!Array.isArray(list)) {
+          return [];
+        }
+        return list.map((item) => String(item).toLowerCase());
+      }
+
+      function userCanAccessView(user, view) {
+        if (!view) return true;
+        if (!user) return false;
+        const normalizedView = String(view).toLowerCase();
+        if (normalizedView === 'home') {
+          return true;
+        }
+        if (normalizedView === 'admin' && String(user.role || '').toLowerCase() !== 'admin') {
+          return false;
+        }
+        const allowedViews = normalizeViewList(user.allowed_views);
+        if (allowedViews.includes('*')) {
+          return true;
+        }
+        return allowedViews.includes(normalizedView);
+      }
+
+      function applyViewVisibility(user) {
+        document.querySelectorAll('[data-view]').forEach((link) => {
+          const requiredView = link.dataset.view ? link.dataset.view.toLowerCase() : '';
+          if (!requiredView) {
+            return;
+          }
+          if (userCanAccessView(user, requiredView)) {
+            link.classList.remove('hidden');
+          } else {
+            link.classList.add('hidden');
+          }
+        });
+      }
+
+      const teamSelect = document.getElementById('team-select');
+      const startInput = document.getElementById('start-date');
+      const endInput = document.getElementById('end-date');
+      const rangeInfo = document.getElementById('range-info');
+      const teamInfo = document.getElementById('team-info');
+      const whiteTarget = document.getElementById('white-target');
+      const personTable = document.getElementById('person-table');
+      const personEmpty = document.getElementById('person-empty');
+      const coverageTable = document.getElementById('coverage-table');
+      const coverageEmpty = document.getElementById('coverage-empty');
+      const tabPerson = document.getElementById('tab-person');
+      const tabCoverage = document.getElementById('tab-coverage');
+      const personContainer = document.getElementById('person-container');
+      const coverageContainer = document.getElementById('coverage-container');
+
+
+      tabPerson.addEventListener('click', () => switchTab('person'));
+      tabCoverage.addEventListener('click', () => switchTab('coverage'));
+
+      document.getElementById('apply-range').addEventListener('click', () => {
+        state.teamId = teamSelect.value ? Number(teamSelect.value) : null;
+        loadPersonStats(true);
+      });
+
+      document.getElementById('refresh-btn').addEventListener('click', () => {
+        loadPersonStats(true);
+      });
+
+      teamSelect.addEventListener('change', () => {
+        state.teamId = teamSelect.value ? Number(teamSelect.value) : null;
+        loadPersonStats(true);
+      });
+
+      async function init() {
+        const allowed = await ensureLoggedIn();
+        if (!allowed) {
+          return;
+        }
+        await loadPersonStats(true);
+      }
+
+      async function ensureLoggedIn() {
+        try {
+          const response = await fetch('/api/auth.php?action=me', {
+            method: 'GET',
+            credentials: 'include',
+          });
+          if (!response.ok) {
+            window.location.href = '/public/login.html';
+            return false;
+          }
+          const data = await response.json().catch(() => null);
+          if (!data || !data.ok || !data.user) {
+            window.location.href = '/public/login.html';
+            return false;
+          }
+          state.user = data.user;
+          document.getElementById('user-name').textContent = data.user.display_name || '';
+          applyViewVisibility(state.user);
+          if (!userCanAccessView(state.user, CURRENT_VIEW)) {
+            App.toast('无权访问该视图');
+            setTimeout(() => {
+              window.location.href = '/public/index.html';
+            }, 800);
+            return false;
+          }
+          return true;
+        } catch (error) {
+          window.location.href = '/public/login.html';
+          return false;
+        }
+      }
+
+      function buildParams(action) {
+        const params = new URLSearchParams();
+        params.set('action', action);
+        if (state.teamId) {
+          params.set('team_id', String(state.teamId));
+        }
+        const startValue = startInput.value ? startInput.value.trim() : '';
+        const endValue = endInput.value ? endInput.value.trim() : '';
+        if (startValue) {
+          params.set('start', startValue);
+        }
+        if (endValue) {
+          params.set('end', endValue);
+        }
+        return params;
+      }
+
+      async function loadPersonStats(force = false) {
+        if (!userCanAccessView(state.user, CURRENT_VIEW)) {
+          App.toast('无权访问该视图');
+          return;
+        }
+        if (state.isLoading && !force) return;
+        state.isLoading = true;
+        App.showLoading('正在加载统计数据…');
+        try {
+          const params = buildParams('by_person');
+          const response = await fetch(`/api/stats.php?${params.toString()}`, {
+            method: 'GET',
+            credentials: 'include',
+          });
+          if (response.status === 401) {
+            window.location.href = '/public/login.html';
+            return;
+          }
+          if (response.status === 403) {
+            App.toast('无权访问统计数据');
+            return;
+          }
+          const data = await response.json().catch(() => null);
+          if (!response.ok || !data || !data.ok) {
+            const message = data && (data.error || data.msg);
+            App.toast(message || '加载统计数据失败');
+            return;
+          }
+          state.teams = Array.isArray(data.teams) ? data.teams : [];
+          state.teamId = data.team_id || null;
+          state.start = data.start || '';
+          state.end = data.end || '';
+          state.rangeDays = Number(data.range_days) || 0;
+          state.monthFactor = Number(data.month_factor) || 1;
+          state.shiftOptions = Array.isArray(data.shift_options) ? data.shift_options : [];
+          state.targetWhite = Number.isFinite(data.target_white_per_month) ? Number(data.target_white_per_month) : 8;
+          state.personRecords = Array.isArray(data.records) ? data.records : [];
+
+          updateFiltersFromState();
+          renderTeams();
+          renderInfo();
+          renderPersonTable();
+          state.coverageKey = '';
+          if (state.activeTab === 'coverage') {
+            await loadCoverageStats(true);
+          }
+        } catch (error) {
+          App.toast('网络异常，请稍后再试');
+        } finally {
+          state.isLoading = false;
+          App.hideLoading();
+        }
+      }
+
+      async function loadCoverageStats(force = false) {
+        if (!state.teamId) {
+          state.coverageDaily = [];
+          renderCoverage();
+          return;
+        }
+        const startValue = startInput.value ? startInput.value.trim() : '';
+        const endValue = endInput.value ? endInput.value.trim() : '';
+        const key = `${state.teamId}|${startValue}|${endValue}`;
+        if (!force && state.coverageKey === key) {
+          renderCoverage();
+          return;
+        }
+        App.showLoading('正在加载在岗数据…');
+        try {
+          const params = buildParams('coverage_by_day');
+          const response = await fetch(`/api/stats.php?${params.toString()}`, {
+            method: 'GET',
+            credentials: 'include',
+          });
+          if (response.status === 401) {
+            window.location.href = '/public/login.html';
+            return;
+          }
+          if (response.status === 403) {
+            App.toast('无权访问在岗分析');
+            return;
+          }
+          const data = await response.json().catch(() => null);
+          if (!response.ok || !data || !data.ok) {
+            const message = data && (data.error || data.msg);
+            App.toast(message || '加载在岗数据失败');
+            return;
+          }
+          state.coverageDaily = Array.isArray(data.daily) ? data.daily : [];
+          state.coverageKey = key;
+          renderCoverage();
+        } catch (error) {
+          App.toast('网络异常，请稍后再试');
+        } finally {
+          App.hideLoading();
+        }
+      }
+
+      function renderTeams() {
+        teamSelect.innerHTML = '';
+        if (!state.teams.length) {
+          const option = document.createElement('option');
+          option.textContent = '暂无可访问团队';
+          option.disabled = true;
+          option.selected = true;
+          teamSelect.appendChild(option);
+          teamSelect.disabled = true;
+          startInput.disabled = true;
+          endInput.disabled = true;
+          document.getElementById('apply-range').disabled = true;
+          document.getElementById('refresh-btn').disabled = true;
+          return;
+        }
+
+        teamSelect.disabled = false;
+        startInput.disabled = false;
+        endInput.disabled = false;
+        document.getElementById('apply-range').disabled = false;
+        document.getElementById('refresh-btn').disabled = false;
+
+        state.teams.forEach((team) => {
+          const option = document.createElement('option');
+          option.value = team.id;
+          option.textContent = team.name;
+          if (team.id === state.teamId) {
+            option.selected = true;
+          }
+          teamSelect.appendChild(option);
+        });
+      }
+
+      function updateFiltersFromState() {
+        if (state.start) {
+          startInput.value = state.start;
+        }
+        if (state.end) {
+          endInput.value = state.end;
+        }
+      }
+
+      function renderInfo() {
+        whiteTarget.textContent = `${state.targetWhite}`;
+        const team = state.teams.find((item) => item.id === state.teamId);
+        teamInfo.textContent = team ? `团队：${team.name}` : '暂无团队';
+        rangeInfo.textContent = state.rangeDays > 0 ? `统计区间：${state.start} 至 ${state.end}（共 ${state.rangeDays} 天）` : '';
+      }
+
+      function renderPersonTable() {
+        personTable.innerHTML = '';
+        if (!state.personRecords.length) {
+          personEmpty.classList.remove('hidden');
+          return;
+        }
+        personEmpty.classList.add('hidden');
+
+        state.personRecords.forEach((record) => {
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-slate-800/40 transition';
+
+          const nameTd = document.createElement('td');
+          nameTd.className = 'px-4 py-3';
+          nameTd.textContent = record.name || '-';
+
+          const displayTd = document.createElement('td');
+          displayTd.className = 'px-4 py-3';
+          displayTd.textContent = record.display_name || '-';
+
+          const activeTd = document.createElement('td');
+          activeTd.className = 'px-4 py-3 text-center';
+          activeTd.innerHTML = record.active
+            ? '<span class="px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-200 text-xs">启用</span>'
+            : '<span class="px-2 py-1 rounded-full bg-slate-700/40 text-slate-400 text-xs">停用</span>';
+
+          const workTd = document.createElement('td');
+          workTd.className = 'px-4 py-3 text-right font-medium';
+          workTd.textContent = Number(record.work_days || 0);
+
+          const shiftCounts = record.shift_counts || {};
+          const monthlyAvg = record.monthly_average || {};
+
+          const whiteTd = createNumberCell(shiftCounts['白']);
+          const mid1Td = createNumberCell(shiftCounts['中1']);
+          const mid2Td = createNumberCell(shiftCounts['中2']);
+          const nightTd = createNumberCell(shiftCounts['夜']);
+          const restTd = createNumberCell(shiftCounts['休息']);
+
+          const monthlyWhiteTd = createNumberCell(monthlyAvg['白'], true);
+          const monthlyMid1Td = createNumberCell(monthlyAvg['中1'], true);
+          const monthlyMid2Td = createNumberCell(monthlyAvg['中2'], true);
+          const monthlyNightTd = createNumberCell(monthlyAvg['夜'], true);
+
+          const diffTd = document.createElement('td');
+          diffTd.className = 'px-4 py-3 text-right';
+          const diffValue = Number(record.white_target_diff || 0);
+          diffTd.textContent = diffValue.toFixed(2);
+          diffTd.classList.add(diffValue >= 0 ? 'text-emerald-300' : 'text-rose-300');
+
+          tr.appendChild(nameTd);
+          tr.appendChild(displayTd);
+          tr.appendChild(activeTd);
+          tr.appendChild(workTd);
+          tr.appendChild(whiteTd);
+          tr.appendChild(mid1Td);
+          tr.appendChild(mid2Td);
+          tr.appendChild(nightTd);
+          tr.appendChild(restTd);
+          tr.appendChild(monthlyWhiteTd);
+          tr.appendChild(monthlyMid1Td);
+          tr.appendChild(monthlyMid2Td);
+          tr.appendChild(monthlyNightTd);
+          tr.appendChild(diffTd);
+
+          personTable.appendChild(tr);
+        });
+      }
+
+      function createNumberCell(value, fixed = false) {
+        const td = document.createElement('td');
+        td.className = 'px-4 py-3 text-right';
+        if (value === null || value === undefined) {
+          td.textContent = '-';
+        } else if (fixed) {
+          td.textContent = Number(value).toFixed(2);
+        } else {
+          td.textContent = Number(value);
+        }
+        return td;
+      }
+
+      function renderCoverage() {
+        coverageTable.innerHTML = '';
+        if (!state.coverageDaily.length) {
+          coverageEmpty.classList.remove('hidden');
+          destroyChart();
+          return;
+        }
+        coverageEmpty.classList.add('hidden');
+
+        const labels = [];
+        const totalSeries = [];
+        const whiteSeries = [];
+        const mid1Series = [];
+        const mid2Series = [];
+        const nightSeries = [];
+
+        state.coverageDaily.forEach((item) => {
+          labels.push(item.day.slice(5));
+          totalSeries.push(Number(item.on_duty || 0));
+          const counts = item.shift_counts || {};
+          whiteSeries.push(Number(counts['白'] || 0));
+          mid1Series.push(Number(counts['中1'] || 0));
+          mid2Series.push(Number(counts['中2'] || 0));
+          nightSeries.push(Number(counts['夜'] || 0));
+
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-slate-800/40 transition';
+
+          const dayTd = document.createElement('td');
+          dayTd.className = 'px-4 py-3';
+          dayTd.textContent = item.day;
+
+          const weekdayTd = document.createElement('td');
+          weekdayTd.className = 'px-4 py-3';
+          weekdayTd.textContent = item.weekday || '';
+
+          const onDutyTd = createNumberCell(item.on_duty || 0);
+          const whiteTd = createNumberCell(counts['白'] || 0);
+          const mid1Td = createNumberCell(counts['中1'] || 0);
+          const mid2Td = createNumberCell(counts['中2'] || 0);
+          const nightTd = createNumberCell(counts['夜'] || 0);
+
+          tr.appendChild(dayTd);
+          tr.appendChild(weekdayTd);
+          tr.appendChild(onDutyTd);
+          tr.appendChild(whiteTd);
+          tr.appendChild(mid1Td);
+          tr.appendChild(mid2Td);
+          tr.appendChild(nightTd);
+
+          coverageTable.appendChild(tr);
+        });
+
+        drawChart(labels, totalSeries, whiteSeries, mid1Series, mid2Series, nightSeries);
+      }
+
+      function drawChart(labels, totals, white, mid1, mid2, night) {
+        destroyChart();
+        const ctx = document.getElementById('coverage-chart').getContext('2d');
+        state.chart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: '白班',
+                data: white,
+                backgroundColor: 'rgba(56, 189, 248, 0.55)',
+                borderRadius: 14,
+                stack: 'shifts',
+              },
+              {
+                label: '中1',
+                data: mid1,
+                backgroundColor: 'rgba(129, 140, 248, 0.6)',
+                borderRadius: 14,
+                stack: 'shifts',
+              },
+              {
+                label: '中2',
+                data: mid2,
+                backgroundColor: 'rgba(236, 72, 153, 0.55)',
+                borderRadius: 14,
+                stack: 'shifts',
+              },
+              {
+                label: '夜班',
+                data: night,
+                backgroundColor: 'rgba(20, 184, 166, 0.6)',
+                borderRadius: 14,
+                stack: 'shifts',
+              },
+              {
+                type: 'line',
+                label: '在岗人数',
+                data: totals,
+                borderColor: '#facc15',
+                backgroundColor: '#facc15',
+                borderWidth: 2,
+                tension: 0.35,
+                fill: false,
+                yAxisID: 'yLine',
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+              mode: 'index',
+              intersect: false,
+            },
+            plugins: {
+              legend: {
+                labels: {
+                  color: '#cbd5f5',
+                },
+              },
+              tooltip: {
+                callbacks: {
+                  label(context) {
+                    const value = context.parsed.y ?? context.parsed;
+                    return `${context.dataset.label}: ${value}`;
+                  },
+                },
+              },
+            },
+            scales: {
+              x: {
+                stacked: true,
+                ticks: {
+                  color: '#94a3b8',
+                },
+                grid: {
+                  color: 'rgba(148, 163, 184, 0.1)',
+                },
+              },
+              y: {
+                stacked: true,
+                position: 'left',
+                ticks: {
+                  color: '#94a3b8',
+                  precision: 0,
+                },
+                grid: {
+                  color: 'rgba(148, 163, 184, 0.1)',
+                },
+              },
+              yLine: {
+                stacked: false,
+                position: 'right',
+                ticks: {
+                  color: '#fde68a',
+                  precision: 0,
+                },
+                grid: {
+                  drawOnChartArea: false,
+                },
+              },
+            },
+          },
+        });
+      }
+
+      function destroyChart() {
+        if (state.chart) {
+          state.chart.destroy();
+          state.chart = null;
+        }
+      }
+
+      function switchTab(tab) {
+        if (state.activeTab === tab) return;
+        state.activeTab = tab;
+        if (tab === 'person') {
+          tabPerson.className = 'px-4 py-2 rounded-xl border border-slate-700/70 bg-slate-900/70 text-slate-200';
+          tabCoverage.className = 'px-4 py-2 rounded-xl border border-transparent text-slate-300 hover:border-slate-700/70 hover:bg-slate-800/60';
+          personContainer.classList.remove('hidden');
+          coverageContainer.classList.add('hidden');
+        } else {
+          tabCoverage.className = 'px-4 py-2 rounded-xl border border-slate-700/70 bg-slate-900/70 text-slate-200';
+          tabPerson.className = 'px-4 py-2 rounded-xl border border-transparent text-slate-300 hover:border-slate-700/70 hover:bg-slate-800/60';
+          personContainer.classList.add('hidden');
+          coverageContainer.classList.remove('hidden');
+          loadCoverageStats();
+        }
+      }
+
+      App.ready(() => {
+        App.initSidebar({ activeView: 'stats' });
+        init();
+      });
+    </script>
+  </body>
+</html>
