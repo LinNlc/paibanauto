@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>排班助手 - 登录</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/public/css/app.css" />
+    <style>
+      body {
+        background: linear-gradient(-45deg, #0f172a, #1e293b, #0b1120, #111827);
+        background-size: 400% 400%;
+        animation: gradientFlow 12s ease infinite;
+      }
+
+      @keyframes gradientFlow {
+        0% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+        100% {
+          background-position: 0% 50%;
+        }
+      }
+
+      .login-card {
+        background-color: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        box-shadow: 0 24px 48px rgba(15, 23, 42, 0.45);
+      }
+    </style>
+  </head>
+  <body class="min-h-screen flex items-center justify-center text-slate-100">
+    <div class="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+      <div class="absolute -top-32 -left-16 w-64 h-64 bg-sky-500/20 rounded-full blur-3xl"></div>
+      <div class="absolute bottom-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl"></div>
+    </div>
+    <div class="relative z-10 w-full max-w-md mx-auto px-6">
+      <div class="login-card rounded-3xl p-8 space-y-6">
+        <div class="text-center space-y-2">
+          <div class="text-sm uppercase tracking-[0.4em] text-sky-300/80">排班助手</div>
+          <h1 class="text-3xl font-semibold">欢迎回来</h1>
+          <p class="text-sm text-slate-400">请输入账号密码登录系统</p>
+        </div>
+        <form class="space-y-5" onsubmit="event.preventDefault();">
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-slate-300">账号</label>
+            <input
+              type="text"
+              name="username"
+              placeholder="请输入账号"
+              class="w-full rounded-xl border border-slate-700/60 bg-slate-900/80 px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              disabled
+            />
+          </div>
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-slate-300">密码</label>
+            <input
+              type="password"
+              name="password"
+              placeholder="请输入密码"
+              class="w-full rounded-xl border border-slate-700/60 bg-slate-900/80 px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              disabled
+            />
+          </div>
+          <button
+            type="button"
+            class="w-full py-3 rounded-xl bg-slate-700/60 text-slate-300 cursor-not-allowed"
+            disabled
+          >
+            登录功能开发中
+          </button>
+        </form>
+        <p class="text-xs text-center text-slate-500">默认账号 admin / admin，安装完成后请尽快修改。</p>
+      </div>
+    </div>
+  </body>
+</html>

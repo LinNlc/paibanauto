@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>排班助手 - 首页</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/public/css/app.css" />
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+          window.location.href = '/public/login.html';
+        }, 3000);
+      });
+    </script>
+  </head>
+  <body class="bg-slate-950 text-slate-100">
+    <div class="site-shell">
+      <aside class="site-sidebar">
+        <div class="site-logo">排班助手</div>
+        <nav>
+          <a href="#">仪表盘</a>
+          <a href="#">排班表</a>
+          <a href="#">团队管理</a>
+        </nav>
+      </aside>
+      <main class="site-content flex items-center justify-center">
+        <div class="text-center space-y-4">
+          <h1 class="text-3xl font-bold tracking-wide">未登录，正在跳转登录页…</h1>
+          <p class="text-slate-300">3 秒后自动跳转，如未跳转请<a class="text-sky-400 underline" href="/public/login.html">点击这里</a>。</p>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
