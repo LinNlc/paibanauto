@@ -127,82 +127,51 @@ function handle_schedule_upsert(PDO $pdo, array $user, array $permissions, array
         $clientVersion = 0;
     }
 
-    if ($value === '') {
-        handle_empty_value_update($pdo, $user, $teamId, $employeeId, $dayValue, $clientVersion);
-        return;
-    }
-
-    $existing = find_schedule_cell($pdo, $teamId, $employeeId, $dayValue);
-    $timestamp = date('Y-m-d H:i:s');
     $userId = (int) ($user['id'] ?? 0);
-
-    if ($existing !== null) {
-        $currentVersion = (int) $existing['version'];
-        if ($clientVersion < $currentVersion) {
-            json_err('存在更新冲突', 409, [
-                'conflict' => true,
-                'current_version' => $currentVersion,
-                'current_value' => (string) ($existing['value'] ?? ''),
-            ]);
-        }
-
-        $newVersion = $currentVersion + 1;
-        $stmt = $pdo->prepare('UPDATE schedule_cells SET value = :value, version = :version, updated_at = :updated_at, updated_by = :updated_by WHERE id = :id');
-        $stmt->bindValue(':value', $value, PDO::PARAM_STR);
-        $stmt->bindValue(':version', $newVersion, PDO::PARAM_INT);
-        $stmt->bindValue(':updated_at', $timestamp, PDO::PARAM_STR);
-        if ($userId > 0) {
-            $stmt->bindValue(':updated_by', $userId, PDO::PARAM_INT);
-        } else {
-            $stmt->bindValue(':updated_by', null, PDO::PARAM_NULL);
-        }
-        $stmt->bindValue(':id', (int) $existing['id'], PDO::PARAM_INT);
-        $stmt->execute();
-
-        json_ok([
-            'new_version' => $newVersion,
-            'cell' => [
-                'day' => $dayValue,
-                'emp_id' => $employeeId,
-                'value' => $value,
-                'version' => $newVersion,
-                'updated_at' => $timestamp,
-                'updated_by' => [
-                    'id' => $userId,
-                    'display_name' => (string) ($user['display_name'] ?? ''),
-                ],
-            ],
-        ]);
-        return;
+    $userDisplay = trim((string) ($user['display_name'] ?? ''));
+    if ($userDisplay === '') {
+        $userDisplay = (string) ($user['username'] ?? '');
     }
 
-    $stmt = $pdo->prepare('INSERT INTO schedule_cells (team_id, day, emp_id, value, version, updated_at, updated_by) VALUES (:team_id, :day, :emp_id, :value, :version, :updated_at, :updated_by)');
-    $stmt->bindValue(':team_id', $teamId, PDO::PARAM_INT);
-    $stmt->bindValue(':day', $dayValue, PDO::PARAM_STR);
-    $stmt->bindValue(':emp_id', $employeeId, PDO::PARAM_INT);
-    $stmt->bindValue(':value', $value, PDO::PARAM_STR);
-    $stmt->bindValue(':version', 1, PDO::PARAM_INT);
-    $stmt->bindValue(':updated_at', $timestamp, PDO::PARAM_STR);
-    if ($userId > 0) {
-        $stmt->bindValue(':updated_by', $userId, PDO::PARAM_INT);
+    if ($value === '') {
+        $result = process_empty_value_update($pdo, $userId, $userDisplay, $teamId, $employeeId, $dayValue, $clientVersion);
     } else {
-        $stmt->bindValue(':updated_by', null, PDO::PARAM_NULL);
+        $result = process_value_update($pdo, $userId, $userDisplay, $teamId, $employeeId, $dayValue, $value, $clientVersion);
     }
-    $stmt->execute();
 
-    json_ok([
-        'new_version' => 1,
-        'cell' => [
+    if (($result['changed'] ?? false) === true) {
+        $cellUser = $result['cell']['updated_by'] ?? null;
+        $updatedById = null;
+        $updatedByName = $userDisplay;
+        if (is_array($cellUser)) {
+            if (isset($cellUser['id'])) {
+                $updatedById = (int) $cellUser['id'];
+            }
+            if (isset($cellUser['display_name']) && trim((string) $cellUser['display_name']) !== '') {
+                $updatedByName = (string) $cellUser['display_name'];
+            }
+        }
+        $event = [
+            'team_id' => $teamId,
             'day' => $dayValue,
             'emp_id' => $employeeId,
-            'value' => $value,
-            'version' => 1,
-            'updated_at' => $timestamp,
-            'updated_by' => [
-                'id' => $userId,
-                'display_name' => (string) ($user['display_name'] ?? ''),
-            ],
-        ],
+            'value' => $result['cell']['value'],
+            'version' => $result['cell']['version'],
+            'updated_at' => $result['cell']['updated_at'],
+            'updated_by' => $updatedById,
+            'updated_by_name' => $updatedByName,
+        ];
+        $actorId = $updatedById;
+        record_schedule_op($pdo, $teamId, [
+            'type' => 'schedule_cell_update',
+            'cell' => $event,
+        ], $actorId !== null ? (int) $actorId : null);
+        append_sse_event($event);
+    }
+
+    json_ok([
+        'new_version' => $result['new_version'],
+        'cell' => $result['cell'],
     ]);
 }
 
@@ -396,12 +365,13 @@ function find_schedule_cell(PDO $pdo, int $teamId, int $employeeId, string $day)
     return $row;
 }
 
-function handle_empty_value_update(PDO $pdo, array $user, int $teamId, int $employeeId, string $day, int $clientVersion): void
+function process_empty_value_update(PDO $pdo, int $userId, string $userDisplay, int $teamId, int $employeeId, string $day, int $clientVersion): array
 {
     $existing = find_schedule_cell($pdo, $teamId, $employeeId, $day);
     if ($existing === null) {
-        json_ok([
+        return [
             'new_version' => 0,
+            'changed' => false,
             'cell' => [
                 'day' => $day,
                 'emp_id' => $employeeId,
@@ -410,7 +380,7 @@ function handle_empty_value_update(PDO $pdo, array $user, int $teamId, int $empl
                 'updated_at' => null,
                 'updated_by' => null,
             ],
-        ]);
+        ];
     }
 
     $currentVersion = (int) $existing['version'];
@@ -424,7 +394,6 @@ function handle_empty_value_update(PDO $pdo, array $user, int $teamId, int $empl
 
     $newVersion = $currentVersion + 1;
     $timestamp = date('Y-m-d H:i:s');
-    $userId = (int) ($user['id'] ?? 0);
 
     $stmt = $pdo->prepare('UPDATE schedule_cells SET value = NULL, version = :version, updated_at = :updated_at, updated_by = :updated_by WHERE id = :id');
     $stmt->bindValue(':version', $newVersion, PDO::PARAM_INT);
@@ -437,8 +406,9 @@ function handle_empty_value_update(PDO $pdo, array $user, int $teamId, int $empl
     $stmt->bindValue(':id', (int) $existing['id'], PDO::PARAM_INT);
     $stmt->execute();
 
-    json_ok([
+    return [
         'new_version' => $newVersion,
+        'changed' => true,
         'cell' => [
             'day' => $day,
             'emp_id' => $employeeId,
@@ -447,8 +417,84 @@ function handle_empty_value_update(PDO $pdo, array $user, int $teamId, int $empl
             'updated_at' => $timestamp,
             'updated_by' => $userId > 0 ? [
                 'id' => $userId,
-                'display_name' => (string) ($user['display_name'] ?? ''),
+                'display_name' => $userDisplay,
             ] : null,
         ],
-    ]);
+    ];
+}
+
+function process_value_update(PDO $pdo, int $userId, string $userDisplay, int $teamId, int $employeeId, string $day, string $value, int $clientVersion): array
+{
+    $existing = find_schedule_cell($pdo, $teamId, $employeeId, $day);
+    $timestamp = date('Y-m-d H:i:s');
+
+    if ($existing !== null) {
+        $currentVersion = (int) $existing['version'];
+        if ($clientVersion < $currentVersion) {
+            json_err('存在更新冲突', 409, [
+                'conflict' => true,
+                'current_version' => $currentVersion,
+                'current_value' => (string) ($existing['value'] ?? ''),
+            ]);
+        }
+
+        $newVersion = $currentVersion + 1;
+        $stmt = $pdo->prepare('UPDATE schedule_cells SET value = :value, version = :version, updated_at = :updated_at, updated_by = :updated_by WHERE id = :id');
+        $stmt->bindValue(':value', $value, PDO::PARAM_STR);
+        $stmt->bindValue(':version', $newVersion, PDO::PARAM_INT);
+        $stmt->bindValue(':updated_at', $timestamp, PDO::PARAM_STR);
+        if ($userId > 0) {
+            $stmt->bindValue(':updated_by', $userId, PDO::PARAM_INT);
+        } else {
+            $stmt->bindValue(':updated_by', null, PDO::PARAM_NULL);
+        }
+        $stmt->bindValue(':id', (int) $existing['id'], PDO::PARAM_INT);
+        $stmt->execute();
+
+        return [
+            'new_version' => $newVersion,
+            'changed' => true,
+            'cell' => [
+                'day' => $day,
+                'emp_id' => $employeeId,
+                'value' => $value,
+                'version' => $newVersion,
+                'updated_at' => $timestamp,
+                'updated_by' => $userId > 0 ? [
+                    'id' => $userId,
+                    'display_name' => $userDisplay,
+                ] : null,
+            ],
+        ];
+    }
+
+    $stmt = $pdo->prepare('INSERT INTO schedule_cells (team_id, day, emp_id, value, version, updated_at, updated_by) VALUES (:team_id, :day, :emp_id, :value, :version, :updated_at, :updated_by)');
+    $stmt->bindValue(':team_id', $teamId, PDO::PARAM_INT);
+    $stmt->bindValue(':day', $day, PDO::PARAM_STR);
+    $stmt->bindValue(':emp_id', $employeeId, PDO::PARAM_INT);
+    $stmt->bindValue(':value', $value, PDO::PARAM_STR);
+    $stmt->bindValue(':version', 1, PDO::PARAM_INT);
+    $stmt->bindValue(':updated_at', $timestamp, PDO::PARAM_STR);
+    if ($userId > 0) {
+        $stmt->bindValue(':updated_by', $userId, PDO::PARAM_INT);
+    } else {
+        $stmt->bindValue(':updated_by', null, PDO::PARAM_NULL);
+    }
+    $stmt->execute();
+
+    return [
+        'new_version' => 1,
+        'changed' => true,
+        'cell' => [
+            'day' => $day,
+            'emp_id' => $employeeId,
+            'value' => $value,
+            'version' => 1,
+            'updated_at' => $timestamp,
+            'updated_by' => $userId > 0 ? [
+                'id' => $userId,
+                'display_name' => $userDisplay,
+            ] : null,
+        ],
+    ];
 }

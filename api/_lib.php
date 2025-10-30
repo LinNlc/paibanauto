@@ -312,3 +312,69 @@ function permissions_can_edit_team(array $permissions, int $teamId): bool
 
     return in_array($teamId, $editable, true);
 }
+
+function sse_events_log_path(): string
+{
+    $config = app_config();
+    $dbPath = (string) ($config['db_path'] ?? (__DIR__ . '/../data/schedule.db'));
+    $baseDir = dirname($dbPath);
+
+    return $baseDir . '/sse_events.log';
+}
+
+function append_sse_event(array $event): void
+{
+    $payload = $event;
+    if (!isset($payload['dispatched_at'])) {
+        $payload['dispatched_at'] = gmdate('c');
+    }
+
+    $encoded = json_encode($payload, JSON_UNESCAPED_UNICODE);
+    if ($encoded === false) {
+        return;
+    }
+
+    $path = sse_events_log_path();
+    $directory = dirname($path);
+    if (!is_dir($directory)) {
+        @mkdir($directory, 0775, true);
+    }
+
+    $handle = @fopen($path, 'ab');
+    if ($handle === false) {
+        return;
+    }
+
+    try {
+        if (flock($handle, LOCK_EX)) {
+            fwrite($handle, $encoded . "\n");
+            fflush($handle);
+            flock($handle, LOCK_UN);
+        }
+    } finally {
+        fclose($handle);
+    }
+}
+
+function record_schedule_op(PDO $pdo, int $teamId, array $op, ?int $userId = null): void
+{
+    $json = json_encode($op, JSON_UNESCAPED_UNICODE);
+    if ($json === false) {
+        return;
+    }
+
+    try {
+        $stmt = $pdo->prepare('INSERT INTO ops_log (team_id, op_json, created_at, created_by) VALUES (:team_id, :op_json, :created_at, :created_by)');
+        $stmt->bindValue(':team_id', $teamId, PDO::PARAM_INT);
+        $stmt->bindValue(':op_json', $json, PDO::PARAM_STR);
+        $stmt->bindValue(':created_at', date('Y-m-d H:i:s'), PDO::PARAM_STR);
+        if ($userId !== null && $userId > 0) {
+            $stmt->bindValue(':created_by', $userId, PDO::PARAM_INT);
+        } else {
+            $stmt->bindValue(':created_by', null, PDO::PARAM_NULL);
+        }
+        $stmt->execute();
+    } catch (Throwable $e) {
+        // 忽略日志写入异常，避免影响主流程
+    }
+}

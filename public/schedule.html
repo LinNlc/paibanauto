@@ -143,6 +143,11 @@
         cursor: not-allowed;
       }
 
+      .schedule-cell.pending {
+        box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.45);
+        background: rgba(56, 189, 248, 0.18);
+      }
+
       #shift-popover {
         min-width: 160px;
         background: rgba(15, 23, 42, 0.98);
@@ -319,6 +324,11 @@
         windowSize: 14,
       };
 
+      const pendingUpdates = new Map();
+      let sseSource = null;
+      let sseReconnectTimer = null;
+      let currentSseKey = '';
+
       const elements = {
         teamSelect: document.getElementById('team-select'),
         startInput: document.getElementById('start-date'),
@@ -452,6 +462,7 @@
       }
 
       async function loadScheduleData(options = {}) {
+        teardownSSE();
         const params = new URLSearchParams();
         if (state.teamId) {
           params.set('team_id', String(state.teamId));
@@ -494,6 +505,7 @@
         state.shiftOptions = Array.isArray(data.shift_options) ? data.shift_options : [];
         state.days = buildDays(state.start, state.end);
         state.cells = parseCells(data.cells || {});
+        pendingUpdates.clear();
 
         if (!options.preserveWindow) {
           state.windowStart = 0;
@@ -506,6 +518,166 @@
         renderLegend();
         updateWindowInfo();
         renderTable();
+        connectSSE();
+      }
+
+      function teardownSSE() {
+        if (sseSource) {
+          sseSource.removeEventListener('op', handleSseOp);
+          sseSource.close();
+          sseSource = null;
+        }
+        if (sseReconnectTimer) {
+          clearTimeout(sseReconnectTimer);
+          sseReconnectTimer = null;
+        }
+        currentSseKey = '';
+      }
+
+      function connectSSE() {
+        if (!state.teamId || !state.start || !state.end) {
+          teardownSSE();
+          return;
+        }
+
+        const key = `${state.teamId}|${state.start}|${state.end}`;
+        if (currentSseKey === key && sseSource) {
+          return;
+        }
+
+        teardownSSE();
+        const params = new URLSearchParams({
+          team_id: state.teamId,
+          start: state.start,
+          end: state.end,
+        });
+        const source = new EventSource(`/api/sse.php?${params.toString()}`);
+        source.addEventListener('op', handleSseOp);
+        source.onopen = () => {
+          if (sseReconnectTimer) {
+            clearTimeout(sseReconnectTimer);
+            sseReconnectTimer = null;
+          }
+        };
+        source.onerror = () => {
+          if (sseSource) {
+            sseSource.close();
+          }
+          sseSource = null;
+          scheduleSseReconnect();
+        };
+        sseSource = source;
+        currentSseKey = key;
+      }
+
+      function scheduleSseReconnect() {
+        if (sseReconnectTimer) {
+          return;
+        }
+        sseReconnectTimer = setTimeout(() => {
+          sseReconnectTimer = null;
+          connectSSE();
+        }, 3000);
+      }
+
+      function handleSseOp(event) {
+        if (!event || !event.data) {
+          return;
+        }
+        let payload;
+        try {
+          payload = JSON.parse(event.data);
+        } catch (error) {
+          return;
+        }
+        if (!payload || typeof payload !== 'object') {
+          return;
+        }
+
+        const teamId = Number(payload.team_id);
+        if (!Number.isFinite(teamId) || Number(state.teamId || 0) !== teamId) {
+          return;
+        }
+
+        const day = typeof payload.day === 'string' ? payload.day : '';
+        const empId = Number(payload.emp_id);
+        if (!day || !Number.isFinite(empId)) {
+          return;
+        }
+
+        if (state.start && day < state.start) {
+          return;
+        }
+        if (state.end && day > state.end) {
+          return;
+        }
+
+        const key = `${day}|${empId}`;
+        const incomingVersion = Number(payload.version);
+        const version = Number.isFinite(incomingVersion) ? incomingVersion : 0;
+        const currentCell = state.cells.get(key);
+        const currentVersion = currentCell && Number.isFinite(currentCell.version) ? currentCell.version : 0;
+        if (version < currentVersion) {
+          return;
+        }
+
+        const updatedCell = {
+          value: typeof payload.value === 'string' ? payload.value : '',
+          version,
+          updated_at:
+            typeof payload.updated_at === 'string'
+              ? payload.updated_at
+              : currentCell && currentCell.updated_at
+              ? currentCell.updated_at
+              : null,
+          updated_by: null,
+        };
+
+        const hasUpdatedBy = Object.prototype.hasOwnProperty.call(payload, 'updated_by');
+        const hasUpdatedByName = Object.prototype.hasOwnProperty.call(payload, 'updated_by_name');
+        if (hasUpdatedBy || hasUpdatedByName) {
+          let updatedById = null;
+          if (hasUpdatedBy && payload.updated_by !== null && payload.updated_by !== undefined) {
+            const parsed = Number(payload.updated_by);
+            if (Number.isFinite(parsed) && parsed > 0) {
+              updatedById = parsed;
+            }
+          }
+          const displayName = hasUpdatedByName && typeof payload.updated_by_name === 'string' ? payload.updated_by_name : '';
+          if (updatedById !== null) {
+            updatedCell.updated_by = {
+              id: updatedById,
+              display_name:
+                displayName || (currentCell && currentCell.updated_by ? currentCell.updated_by.display_name || '' : ''),
+            };
+          } else if (displayName) {
+            updatedCell.updated_by = { id: null, display_name: displayName };
+          }
+        } else if (currentCell && currentCell.updated_by) {
+          updatedCell.updated_by = currentCell.updated_by;
+        }
+
+        state.cells.set(key, updatedCell);
+
+        const cellEl = document.querySelector(`td[data-day="${day}"][data-emp-id="${empId}"]`);
+        if (cellEl) {
+          cellEl.dataset.version = String(updatedCell.version || 0);
+          cellEl.dataset.value = updatedCell.value || '';
+          cellEl.dataset.pending = '0';
+          updateCellElement(cellEl, updatedCell);
+        }
+
+        const pending = pendingUpdates.get(key);
+        if (pending) {
+          const actorRaw = payload.updated_by;
+          const actorId = actorRaw !== null && actorRaw !== undefined ? Number(actorRaw) : null;
+          const isSelf =
+            state.user && actorId !== null && Number.isFinite(actorId) && Number(state.user.id || 0) === actorId;
+          if (!isSelf && version >= (pending.expectedVersion || 0)) {
+            showToast('该单元格已被他人更新', 'error');
+          }
+          pendingUpdates.delete(key);
+        }
       }
 
       function renderTeamOptions() {
@@ -667,9 +839,15 @@
             td.dataset.disabled = !state.canEdit || !emp.active ? '1' : '0';
 
             const cellKey = `${day.date}|${emp.id}`;
-            const cellData = state.cells.get(cellKey) || { value: '', version: 0 };
+            const cellData = state.cells.get(cellKey) || {
+              value: '',
+              version: 0,
+              updated_at: null,
+              updated_by: null,
+            };
             td.dataset.version = String(cellData.version || 0);
             td.dataset.value = cellData.value || '';
+            td.dataset.pending = pendingUpdates.has(cellKey) ? '1' : '0';
 
             const inner = document.createElement('div');
             inner.className = 'schedule-cell';
@@ -678,6 +856,9 @@
             }
             if (!emp.active) {
               inner.classList.add('disabled');
+            }
+            if (td.dataset.pending === '1') {
+              inner.classList.add('pending');
             }
 
             if (cellData.value) {
@@ -850,6 +1031,22 @@
 
       async function submitShiftValue({ cell, day, empId, value, version }) {
         closePopover();
+        const key = `${day}|${empId}`;
+        const previousCell = state.cells.get(key) || {
+          value: '',
+          version: version || 0,
+          updated_at: null,
+          updated_by: null,
+        };
+
+        const expectedVersion = (previousCell.version || 0) + 1;
+        pendingUpdates.set(key, {
+          expectedVersion,
+          requestedValue: value,
+        });
+        cell.dataset.pending = '1';
+        updateCellElement(cell, previousCell);
+
         const payload = {
           action: 'upsert_cell',
           team_id: state.teamId,
@@ -868,34 +1065,59 @@
             body: JSON.stringify(payload),
           });
         } catch (error) {
+          pendingUpdates.delete(key);
+          cell.dataset.pending = '0';
+          updateCellElement(cell, previousCell);
           showToast('网络异常，保存失败');
           return;
         }
 
         const data = await response.json().catch(() => null);
-        if (!response.ok || !data) {
+        if (!response.ok || !data || !data.ok) {
+          pendingUpdates.delete(key);
+          cell.dataset.pending = '0';
+
+          if (data && data.conflict) {
+            const existing = state.cells.get(key);
+            if (!existing) {
+              const fallbackCell = {
+                value: typeof data.current_value === 'string' ? data.current_value : previousCell.value || '',
+                version: Number.isFinite(Number(data.current_version))
+                  ? Number(data.current_version)
+                  : previousCell.version || 0,
+                updated_at: previousCell.updated_at,
+                updated_by: previousCell.updated_by,
+              };
+              state.cells.set(key, fallbackCell);
+              updateCellElement(cell, fallbackCell);
+            } else {
+              updateCellElement(cell, existing);
+            }
+            showToast('存在新版本，请刷新后重试');
+            return;
+          }
+
+          state.cells.set(key, previousCell);
+          updateCellElement(cell, previousCell);
           const message = data && data.error ? data.error : '保存失败';
           showToast(message);
           return;
         }
 
-        if (!data.ok) {
-          if (data.conflict) {
-            showToast('存在新版本，请刷新后重试');
-          } else {
-            showToast(data.error || '保存失败');
-          }
-          return;
-        }
-
-        const key = `${day}|${empId}`;
         const updatedCell = {
-          value: data.cell ? data.cell.value || '' : value,
-          version: data.cell ? data.cell.version || data.new_version || 0 : data.new_version || 0,
-          updated_at: data.cell ? data.cell.updated_at || null : null,
-          updated_by: data.cell ? data.cell.updated_by || null : null,
+          value: data.cell && typeof data.cell.value === 'string' ? data.cell.value : value || '',
+          version: data.cell && Number.isFinite(Number(data.cell.version))
+            ? Number(data.cell.version)
+            : Number.isFinite(Number(data.new_version))
+            ? Number(data.new_version)
+            : 0,
+          updated_at: data.cell && typeof data.cell.updated_at === 'string' ? data.cell.updated_at : null,
+          updated_by: data.cell && data.cell.updated_by ? data.cell.updated_by : null,
         };
+
         state.cells.set(key, updatedCell);
+        pendingUpdates.delete(key);
+        cell.dataset.pending = '0';
         updateCellElement(cell, updatedCell);
         showToast('已更新班次', 'success');
       }
@@ -910,6 +1132,9 @@
         }
         if (cell.dataset.disabled === '1') {
           inner.classList.add('disabled');
+        }
+        if (cell.dataset.pending === '1') {
+          inner.classList.add('pending');
         }
 
         if (cellData.value) {
@@ -996,6 +1221,10 @@
           setTimeout(() => wrapper.remove(), 300);
         }, 2500);
       }
+
+      window.addEventListener('beforeunload', () => {
+        teardownSSE();
+      });
     </script>
   </body>
 </html>
