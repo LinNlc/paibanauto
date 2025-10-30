@@ -167,3 +167,148 @@ function hash_password(string $password): string
 
     return password_hash($password, PASSWORD_DEFAULT);
 }
+
+/**
+ * @param mixed $value
+ * @return array<int>
+ */
+function normalize_id_list($value): array
+{
+    if (!is_array($value)) {
+        return [];
+    }
+
+    $result = [];
+    foreach ($value as $item) {
+        $id = (int) $item;
+        if ($id <= 0) {
+            continue;
+        }
+        $result[$id] = $id;
+    }
+
+    if ($result === []) {
+        return [];
+    }
+
+    ksort($result);
+
+    return array_values($result);
+}
+
+/**
+ * @param mixed $value
+ * @return array<int, string>
+ */
+function normalize_string_list($value): array
+{
+    if (!is_array($value)) {
+        return [];
+    }
+
+    $result = [];
+    foreach ($value as $item) {
+        $str = trim((string) $item);
+        if ($str === '' || isset($result[$str])) {
+            continue;
+        }
+        $result[$str] = $str;
+    }
+
+    return array_values($result);
+}
+
+function get_shift_options(): array
+{
+    $config = app_config();
+    $options = $config['shift_options'] ?? [];
+    if (!is_array($options)) {
+        return [];
+    }
+
+    $normalized = [];
+    foreach ($options as $option) {
+        $value = (string) $option;
+        if ($value === '') {
+            continue;
+        }
+        $normalized[] = $value;
+    }
+
+    return $normalized;
+}
+
+function load_user_permissions(PDO $pdo, int $userId): ?array
+{
+    if ($userId <= 0) {
+        return null;
+    }
+
+    $stmt = $pdo->prepare('SELECT id, role, disabled, allowed_teams_json, allowed_views_json, editable_teams_json FROM users WHERE id = :id LIMIT 1');
+    $stmt->execute([':id' => $userId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row || (int) $row['disabled'] === 1) {
+        return null;
+    }
+
+    $role = (string) $row['role'];
+    $isAdmin = $role === 'admin';
+    $allowedTeams = $isAdmin ? null : normalize_id_list(decode_json_field($row['allowed_teams_json'] ?? '[]', []));
+    $editableTeams = $isAdmin ? null : normalize_id_list(decode_json_field($row['editable_teams_json'] ?? '[]', []));
+    $allowedViews = $isAdmin ? ['*'] : normalize_string_list(decode_json_field($row['allowed_views_json'] ?? '[]', []));
+
+    return [
+        'id' => (int) $row['id'],
+        'role' => $role,
+        'is_admin' => $isAdmin,
+        'allowed_teams' => $allowedTeams,
+        'editable_teams' => $editableTeams,
+        'allowed_views' => $allowedViews,
+    ];
+}
+
+function permissions_can_view_section(array $permissions, string $section): bool
+{
+    if (($permissions['is_admin'] ?? false) === true) {
+        return true;
+    }
+
+    $allowedViews = $permissions['allowed_views'] ?? [];
+    if (!is_array($allowedViews)) {
+        return false;
+    }
+
+    if (in_array('*', $allowedViews, true)) {
+        return true;
+    }
+
+    return in_array($section, $allowedViews, true);
+}
+
+function permissions_can_access_team(array $permissions, int $teamId): bool
+{
+    if (($permissions['is_admin'] ?? false) === true) {
+        return true;
+    }
+
+    $allowed = $permissions['allowed_teams'] ?? [];
+    if ($allowed === null) {
+        return true;
+    }
+
+    return in_array($teamId, $allowed, true);
+}
+
+function permissions_can_edit_team(array $permissions, int $teamId): bool
+{
+    if (($permissions['is_admin'] ?? false) === true) {
+        return true;
+    }
+
+    $editable = $permissions['editable_teams'] ?? [];
+    if ($editable === null) {
+        return true;
+    }
+
+    return in_array($teamId, $editable, true);
+}
