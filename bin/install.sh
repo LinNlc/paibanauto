@@ -29,7 +29,7 @@ INSERT OR IGNORE INTO users (
     disabled, created_at
 ) VALUES (
     1, 'admin', '管理员', '$2y$12$COi/ECLUl0ZonJ5IJPzhT.ph/9b87G61.6Ero/N.vpbR4/nU0/qhi', 'admin',
-    '[1]', '[]', '[1]',
+    '[1]', '["people","schedule","stats"]', '[1]',
     0, datetime('now')
 );
 

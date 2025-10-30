@@ -110,3 +110,60 @@ function require_login(): array
 
     return $user;
 }
+
+function require_admin(): array
+{
+    $user = require_login();
+    if (($user['role'] ?? '') !== 'admin') {
+        json_err('无权限', 403);
+    }
+
+    return $user;
+}
+
+/**
+ * @template T
+ * @param T $default
+ * @return T|array<mixed>
+ */
+function decode_json_field(?string $json, $default)
+{
+    if ($json === null || $json === '') {
+        return $default;
+    }
+
+    $data = json_decode($json, true);
+    if ($data === null || $data === false) {
+        return $default;
+    }
+
+    return is_array($data) ? $data : $default;
+}
+
+function encode_json_field($value): string
+{
+    $encoded = json_encode($value, JSON_UNESCAPED_UNICODE);
+    if ($encoded === false) {
+        json_err('JSON编码失败', 500);
+    }
+
+    return $encoded;
+}
+
+function hash_password(string $password): string
+{
+    $config = app_config();
+    $options = [];
+    if (isset($config['password_cost'])) {
+        $cost = (int) $config['password_cost'];
+        if ($cost >= 4) {
+            $options['cost'] = $cost;
+        }
+    }
+
+    if ($options !== []) {
+        return password_hash($password, PASSWORD_DEFAULT, $options);
+    }
+
+    return password_hash($password, PASSWORD_DEFAULT);
+}
