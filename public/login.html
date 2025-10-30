@@ -47,37 +47,108 @@
           <h1 class="text-3xl font-semibold">欢迎回来</h1>
           <p class="text-sm text-slate-400">请输入账号密码登录系统</p>
         </div>
-        <form class="space-y-5" onsubmit="event.preventDefault();">
+        <form id="login-form" class="space-y-5">
           <div class="space-y-2">
-            <label class="block text-sm font-medium text-slate-300">账号</label>
+            <label class="block text-sm font-medium text-slate-300" for="username">账号</label>
             <input
+              id="username"
               type="text"
               name="username"
+              autocomplete="username"
               placeholder="请输入账号"
+              required
               class="w-full rounded-xl border border-slate-700/60 bg-slate-900/80 px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
-              disabled
             />
           </div>
           <div class="space-y-2">
-            <label class="block text-sm font-medium text-slate-300">密码</label>
+            <label class="block text-sm font-medium text-slate-300" for="password">密码</label>
             <input
+              id="password"
               type="password"
               name="password"
+              autocomplete="current-password"
               placeholder="请输入密码"
+              required
               class="w-full rounded-xl border border-slate-700/60 bg-slate-900/80 px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
-              disabled
             />
           </div>
           <button
-            type="button"
-            class="w-full py-3 rounded-xl bg-slate-700/60 text-slate-300 cursor-not-allowed"
-            disabled
+            id="submit-btn"
+            type="submit"
+            class="w-full py-3 rounded-xl bg-sky-500 hover:bg-sky-400 transition-colors text-white font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-sky-400"
           >
-            登录功能开发中
+            登录
           </button>
         </form>
         <p class="text-xs text-center text-slate-500">默认账号 admin / admin，安装完成后请尽快修改。</p>
       </div>
     </div>
+    <div id="toast" class="fixed top-6 inset-x-0 flex justify-center pointer-events-none"></div>
+    <script>
+      const toastEl = document.getElementById('toast');
+      const formEl = document.getElementById('login-form');
+      const submitBtn = document.getElementById('submit-btn');
+
+      function showToast(message, type = 'error') {
+        toastEl.innerHTML = '';
+        const wrapper = document.createElement('div');
+        wrapper.className = `pointer-events-auto px-4 py-2 rounded-xl shadow-lg text-sm font-medium ${
+          type === 'success' ? 'bg-emerald-500/90 text-white' : 'bg-rose-500/90 text-white'
+        }`;
+        wrapper.textContent = message;
+        toastEl.appendChild(wrapper);
+        setTimeout(() => {
+          if (toastEl.contains(wrapper)) {
+            wrapper.classList.add('opacity-0', 'transition', 'duration-300');
+            setTimeout(() => wrapper.remove(), 300);
+          }
+        }, 3000);
+      }
+
+      async function handleLogin(event) {
+        event.preventDefault();
+        const username = (document.getElementById('username').value || '').trim();
+        const password = document.getElementById('password').value || '';
+
+        if (!username || !password) {
+          showToast('请输入账号和密码');
+          return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = '登录中...';
+
+        try {
+          const response = await fetch('/api/auth.php?action=login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ username, password }),
+          });
+
+          const data = await response.json().catch(() => null);
+
+          if (!response.ok || !data || !data.ok) {
+            const message = (data && data.error) || '登录失败，请稍后再试';
+            showToast(message);
+            return;
+          }
+
+          showToast('登录成功，即将跳转...', 'success');
+          setTimeout(() => {
+            window.location.href = '/public/index.html';
+          }, 500);
+        } catch (error) {
+          showToast('网络异常，请稍后再试');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = '登录';
+        }
+      }
+
+      formEl.addEventListener('submit', handleLogin);
+    </script>
   </body>
 </html>

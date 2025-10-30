@@ -11,10 +11,32 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="/public/css/app.css" />
     <script>
-      document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => {
+      document.addEventListener('DOMContentLoaded', async () => {
+        const statusText = document.getElementById('status-text');
+        const detailText = document.getElementById('status-detail');
+
+        try {
+          const response = await fetch('/api/auth.php?action=me', {
+            method: 'GET',
+            credentials: 'include',
+          });
+
+          if (!response.ok) {
+            window.location.href = '/public/login.html';
+            return;
+          }
+
+          const data = await response.json();
+          if (!data || !data.ok || !data.user) {
+            window.location.href = '/public/login.html';
+            return;
+          }
+
+          statusText.textContent = `欢迎回来，${data.user.display_name}`;
+          detailText.textContent = '您已成功登录，可继续进行后续操作。';
+        } catch (error) {
           window.location.href = '/public/login.html';
-        }, 3000);
+        }
       });
     </script>
   </head>
@@ -30,8 +52,8 @@
       </aside>
       <main class="site-content flex items-center justify-center">
         <div class="text-center space-y-4">
-          <h1 class="text-3xl font-bold tracking-wide">未登录，正在跳转登录页…</h1>
-          <p class="text-slate-300">3 秒后自动跳转，如未跳转请<a class="text-sky-400 underline" href="/public/login.html">点击这里</a>。</p>
+          <h1 id="status-text" class="text-3xl font-bold tracking-wide">正在验证登录状态…</h1>
+          <p id="status-detail" class="text-slate-300">请稍候。</p>
         </div>
       </main>
     </div>
