@@ -6,56 +6,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>排班助手 - 管理后台</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/public/css/app.css" />
+    <link rel="stylesheet" href="/public/app.css" />
+    <script src="/public/app.js"></script>
     <style>
       .tab-button.active {
-        background: rgba(255, 255, 255, 0.1);
-        color: #fff;
-      }
-      .toast-enter {
-        opacity: 0;
-        transform: translateY(-10px);
-      }
-      .toast-enter-active {
-        opacity: 1;
-        transform: translateY(0);
-        transition: opacity 0.2s ease, transform 0.2s ease;
-      }
-      .toast-leave {
-        opacity: 1;
-      }
-      .toast-leave-active {
-        opacity: 0;
-        transition: opacity 0.3s ease;
+        background: rgba(148, 163, 184, 0.16);
+        color: #e2e8f0;
       }
     </style>
   </head>
-  <body class="bg-slate-950 text-slate-100 min-h-screen">
-    <div class="min-h-screen flex flex-col">
-      <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur py-4">
-        <div class="max-w-6xl mx-auto px-4 flex items-center justify-between">
-          <div>
-            <h1 class="text-2xl font-semibold tracking-wide">排班助手 · 管理后台</h1>
-            <p class="text-sm text-slate-400">管理团队、账号与权限配置</p>
-          </div>
-          <div class="space-x-3 text-sm">
-            <a href="/public/index.html" class="text-sky-300 hover:text-sky-200">返回首页</a>
-            <button id="logout-btn" class="px-3 py-1 border border-slate-700 rounded hover:bg-slate-800">退出登录</button>
-          </div>
+  <body>
+    <button type="button" class="app-sidebar-toggle" data-sidebar-toggle aria-label="展开菜单">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <div class="sidebar-inner">
+          <div class="sidebar-header">排班助手</div>
+          <nav>
+            <a href="/public/index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
+            <a href="/public/people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
+            <a href="/public/schedule.html" data-view="schedule"><span class="nav-indicator"></span>排班表</a>
+            <a href="/public/stats.html" data-view="stats"><span class="nav-indicator"></span>数据统计</a>
+            <a href="/admin/index.html" data-view="admin" class="is-active"><span class="nav-indicator"></span>后台管理</a>
+          </nav>
         </div>
-      </header>
-      <main class="flex-1 py-8">
-        <div class="max-w-6xl mx-auto px-4">
-          <div id="access-denied" class="hidden text-center py-24">
-            <h2 class="text-3xl font-semibold mb-4">暂无权限访问</h2>
+      </aside>
+      <main class="app-main space-y-8 pb-12">
+        <header class="app-header">
+          <div class="header-topline">
+            <div>
+              <h1 class="header-title">管理后台</h1>
+              <p class="header-subtitle">管理团队、账号与权限配置。</p>
+            </div>
+            <div class="flex items-center gap-3 text-sm text-slate-300">
+              <a href="/public/index.html" class="btn-secondary">返回首页</a>
+              <button id="logout-btn" class="btn-secondary">退出登录</button>
+            </div>
+          </div>
+        </header>
+
+        <section class="card-surface space-y-8">
+          <div id="access-denied" class="hidden text-center py-16">
+            <h2 class="text-2xl font-semibold mb-2">暂无权限访问</h2>
             <p class="text-slate-400">请使用管理员账号登录后再次尝试。</p>
           </div>
-          <div id="admin-shell" class="hidden bg-slate-900/60 border border-slate-800 rounded-xl shadow-xl">
-            <div class="flex border-b border-slate-800">
+          <div id="admin-shell" class="hidden space-y-6">
+            <div class="flex border border-slate-800/60 rounded-2xl overflow-hidden bg-slate-900/60">
               <button class="flex-1 tab-button px-6 py-3 font-medium" data-tab="teams">团队管理</button>
               <button class="flex-1 tab-button px-6 py-3 font-medium" data-tab="users">账号与权限</button>
             </div>
-            <div class="p-6 space-y-8">
+            <div class="space-y-8">
               <section id="tab-teams" class="tab-panel space-y-6">
                 <div class="flex items-center justify-between">
                   <div>
@@ -171,7 +174,6 @@
         </div>
       </main>
     </div>
-    <div id="toast-root" class="fixed top-4 right-4 space-y-2 z-50"></div>
     <script>
       const state = {
         me: null,
@@ -187,6 +189,24 @@
         { value: 'stats', label: '统计' },
         { value: 'admin', label: '后台' },
       ];
+
+      function applyViewVisibility(user) {
+        const allowed = Array.isArray(user?.allowed_views)
+          ? user.allowed_views.map((v) => String(v).toLowerCase())
+          : [];
+        document.querySelectorAll('.app-sidebar nav a[data-view]').forEach((link) => {
+          const view = String(link.dataset.view || '').toLowerCase();
+          if (!view || view === 'home') {
+            link.classList.remove('hidden');
+            return;
+          }
+          if (user?.role === 'admin' || allowed.includes('*') || allowed.includes(view)) {
+            link.classList.remove('hidden');
+          } else {
+            link.classList.add('hidden');
+          }
+        });
+      }
 
       const tabButtons = document.querySelectorAll('.tab-button');
       const panels = {
@@ -221,24 +241,6 @@
       const userNewBtn = document.getElementById('user-new-btn');
       const usersList = document.getElementById('users-list');
       const logoutBtn = document.getElementById('logout-btn');
-
-      function showToast(message, type = 'info') {
-        const root = document.getElementById('toast-root');
-        const toast = document.createElement('div');
-        toast.className = `toast-enter px-4 py-2 rounded shadow-lg text-sm ${
-          type === 'error' ? 'bg-rose-600/90 text-white' : 'bg-emerald-600/90 text-white'
-        }`;
-        toast.textContent = message;
-        root.appendChild(toast);
-        requestAnimationFrame(() => {
-          toast.classList.add('toast-enter-active');
-        });
-        setTimeout(() => {
-          toast.classList.remove('toast-enter-active');
-          toast.classList.add('toast-leave-active');
-          toast.addEventListener('transitionend', () => toast.remove(), { once: true });
-        }, 2500);
-      }
 
       function setActiveTab(tab) {
         Object.keys(panels).forEach((key) => {
@@ -502,6 +504,7 @@
       }
 
       async function loadInitialData() {
+        App.showLoading('正在加载后台数据…');
         try {
           const meResp = await apiGet('/api/auth.php?action=me');
           if (!meResp.user || meResp.user.role !== 'admin') {
@@ -514,6 +517,7 @@
             throw new Error('FORBIDDEN');
           }
           state.me = meResp.user;
+          applyViewVisibility(state.me);
           document.getElementById('admin-shell').classList.remove('hidden');
           document.getElementById('access-denied').classList.add('hidden');
           setActiveTab('teams');
@@ -538,6 +542,8 @@
           document.getElementById('admin-shell').classList.add('hidden');
           document.getElementById('access-denied').classList.remove('hidden');
           console.error(error);
+        } finally {
+          App.hideLoading();
         }
       }
 
@@ -551,7 +557,7 @@
         event.preventDefault();
         const name = teamNameInput.value.trim();
         if (!name) {
-          showToast('请填写团队名称', 'error');
+          App.toast('请填写团队名称', 'error');
           return;
         }
         const settingsRaw = teamSettingsInput.value.trim();
@@ -560,12 +566,12 @@
           try {
             const parsed = JSON.parse(settingsRaw);
             if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-              showToast('设置必须为 JSON 对象', 'error');
+              App.toast('设置必须为 JSON 对象', 'error');
               return;
             }
             settings = parsed;
           } catch (err) {
-            showToast('设置 JSON 解析失败', 'error');
+            App.toast('设置 JSON 解析失败', 'error');
             return;
           }
         }
@@ -584,10 +590,10 @@
           if (result.team) {
             syncTeamRecord(result.team);
             resetTeamForm();
-            showToast('团队保存成功');
+            App.toast('团队保存成功');
           }
         } catch (err) {
-          showToast(err.message || '保存失败', 'error');
+          App.toast(err.message || '保存失败', 'error');
         }
       });
 
@@ -613,7 +619,7 @@
         if (target.dataset.action === 'edit-team') {
           const team = state.teams.find((item) => item.id === id);
           if (!team) {
-            showToast('未找到团队数据', 'error');
+            App.toast('未找到团队数据', 'error');
             return;
           }
           state.editingTeamId = team.id;
@@ -629,9 +635,9 @@
           try {
             await apiPost('/api/admin/teams.php', { action: 'delete', id });
             removeTeamRecord(id);
-            showToast('团队已删除');
+            App.toast('团队已删除');
           } catch (err) {
-            showToast(err.message || '删除失败', 'error');
+            App.toast(err.message || '删除失败', 'error');
           }
         }
       });
@@ -647,7 +653,7 @@
         const disabled = userDisabledCheckbox.checked;
 
         if (!username || !displayName) {
-          showToast('用户名和显示名不能为空', 'error');
+          App.toast('用户名和显示名不能为空', 'error');
           return;
         }
 
@@ -667,7 +673,7 @@
         } else {
           const password = userPasswordInput.value;
           if (!password) {
-            showToast('请设置初始密码', 'error');
+            App.toast('请设置初始密码', 'error');
             return;
           }
           payload.password = password;
@@ -678,10 +684,10 @@
           if (result.user) {
             syncUserRecord(result.user);
             resetUserForm();
-            showToast('账号保存成功');
+            App.toast('账号保存成功');
           }
         } catch (err) {
-          showToast(err.message || '保存失败', 'error');
+          App.toast(err.message || '保存失败', 'error');
         }
       });
 
@@ -707,11 +713,11 @@
           }
           const user = state.users.find((item) => item.id === id);
           if (!user) {
-            showToast('未找到账号信息', 'error');
+            App.toast('未找到账号信息', 'error');
             return;
           }
           setUserFormForEdit(user);
-          showToast(`正在编辑 ${user.username}`);
+          App.toast(`正在编辑 ${user.username}`);
         }
       });
 
@@ -729,9 +735,9 @@
             id: state.editingUserId,
             password: newPassword,
           });
-          showToast('密码已更新');
+          App.toast('密码已更新');
         } catch (err) {
-          showToast(err.message || '密码重置失败', 'error');
+          App.toast(err.message || '密码重置失败', 'error');
         }
       });
 
@@ -746,9 +752,9 @@
           await apiPost('/api/admin/users.php', { action: 'delete', id: state.editingUserId });
           removeUserRecord(state.editingUserId);
           resetUserForm();
-          showToast('账号已删除');
+          App.toast('账号已删除');
         } catch (err) {
-          showToast(err.message || '删除失败', 'error');
+          App.toast(err.message || '删除失败', 'error');
         }
       });
 
@@ -762,7 +768,10 @@
         }
       });
 
-      loadInitialData();
+      App.ready(() => {
+        App.initSidebar({ activeView: 'admin' });
+        loadInitialData();
+      });
     </script>
   </body>
 </html>

@@ -8,8 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/public/css/app.css" />
+    <link rel="stylesheet" href="/public/app.css" />
+    <script src="/public/app.js"></script>
     <style>
       :root {
         --schedule-date-width: 140px;
@@ -198,83 +198,75 @@
       }
     </style>
   </head>
-  <body class="bg-slate-950 text-slate-100">
-    <div class="site-shell">
-      <aside class="site-sidebar">
-        <div class="site-logo">排班助手</div>
-        <nav>
-          <a href="/public/index.html">仪表盘</a>
-          <a href="/public/people.html" data-view="people">人员管理</a>
-          <a href="/public/schedule.html" class="opacity-100" data-view="schedule">排班表</a>
-          <a href="/public/stats.html" data-view="stats">数据统计</a>
-          <a href="/admin/index.html" data-view="admin">后台管理</a>
-        </nav>
+  <body>
+    <button type="button" class="app-sidebar-toggle" data-sidebar-toggle aria-label="展开菜单">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <div class="sidebar-inner">
+          <div class="sidebar-header">排班助手</div>
+          <nav>
+            <a href="/public/index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
+            <a href="/public/people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
+            <a href="/public/schedule.html" data-view="schedule" class="is-active"><span class="nav-indicator"></span>排班表</span></a>
+            <a href="/public/stats.html" data-view="stats"><span class="nav-indicator"></span>数据统计</a>
+            <a href="/admin/index.html" data-view="admin"><span class="nav-indicator"></span>后台管理</a>
+          </nav>
+        </div>
       </aside>
-      <main class="site-content space-y-6 pb-12">
-        <header class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div class="inline-flex items-center gap-2 text-sm text-slate-400">
-              <span class="px-3 py-1 rounded-full bg-slate-900/80 border border-slate-700/60">排班中心</span>
-              <span class="hidden sm:inline">核心视图</span>
+      <main class="app-main space-y-8 pb-12">
+        <header class="app-header">
+          <div class="header-topline">
+            <div>
+              <div class="inline-flex items-center gap-2 text-sm text-slate-400">
+                <span class="px-3 py-1 rounded-full border border-slate-700/60 bg-slate-900/70">排班中心</span>
+                <span class="hidden sm:inline">核心视图</span>
+              </div>
+              <h1 class="header-title mt-2">排班日历</h1>
+              <p class="header-subtitle">查看并维护团队排班安排，支持快速切换日期与班次。</p>
             </div>
-            <h1 class="mt-2 text-3xl font-semibold tracking-wide">排班日历</h1>
-            <p class="text-slate-400 text-sm">查看并维护团队排班安排，支持快速切换日期与班次。</p>
-          </div>
-          <div class="flex flex-col items-start gap-2 text-sm text-slate-400 sm:items-end">
-            <div>当前用户：<span id="user-name" class="text-slate-200 font-medium"></span></div>
-            <div id="edit-state" class="inline-flex items-center gap-2 text-xs px-3 py-1 rounded-full border border-slate-700/70 text-slate-300"></div>
-          </div>
-        </header>
-
-        <section class="schedule-card p-6 space-y-5">
-          <div class="grid gap-4 lg:grid-cols-4">
-            <div class="flex flex-col gap-2">
-              <label for="team-select" class="text-sm text-slate-400">选择团队</label>
-              <select
-                id="team-select"
-                class="rounded-xl bg-slate-950/70 border border-slate-800 px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
-              ></select>
-            </div>
-            <div class="flex flex-col gap-2">
-              <label class="text-sm text-slate-400" for="start-date">起始日期</label>
-              <input
-                id="start-date"
-                type="date"
-                class="rounded-xl bg-slate-950/70 border border-slate-800 px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
-              />
-            </div>
-            <div class="flex flex-col gap-2">
-              <label class="text-sm text-slate-400" for="end-date">结束日期</label>
-              <input
-                id="end-date"
-                type="date"
-                class="rounded-xl bg-slate-950/70 border border-slate-800 px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
-              />
-            </div>
-            <div class="flex flex-col gap-2">
-              <label class="text-sm text-slate-400" for="window-size">视图跨度</label>
-              <select
-                id="window-size"
-                class="rounded-xl bg-slate-950/70 border border-slate-800 px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
-              >
-                <option value="7">7 天</option>
-                <option value="14" selected>14 天</option>
-                <option value="21">21 天</option>
-                <option value="30">30 天</option>
-              </select>
+            <div class="flex flex-col items-start gap-2 text-sm text-slate-400 sm:items-end">
+              <div>当前用户：<span id="user-name" class="text-slate-200 font-medium"></span></div>
+              <div id="edit-state" class="inline-flex items-center gap-2 text-xs px-3 py-1 rounded-full border border-slate-700/70 text-slate-300"></div>
             </div>
           </div>
-
-          <div class="flex flex-wrap items-center gap-3 text-sm">
-            <button id="apply-range" class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 transition text-white">应用日期</button>
-            <button id="range-today" class="px-4 py-2 rounded-xl border border-slate-700/70 text-slate-300 hover:bg-slate-800/70">回到今日</button>
-            <button id="range-prev" class="px-4 py-2 rounded-xl border border-slate-700/70 text-slate-300 hover:bg-slate-800/70">向前一段</button>
-            <button id="range-next" class="px-4 py-2 rounded-xl border border-slate-700/70 text-slate-300 hover:bg-slate-800/70">向后一段</button>
-            <span id="window-info" class="ml-auto text-xs uppercase tracking-[0.25em] text-slate-500"></span>
+          <div class="app-toolbar">
+            <div class="toolbar-controls flex-wrap gap-4">
+              <div class="toolbar-group min-w-[160px]">
+                <label for="team-select">选择团队</label>
+                <select id="team-select" class="select-input"></select>
+              </div>
+              <div class="toolbar-group">
+                <label for="start-date">起始日期</label>
+                <input id="start-date" type="date" class="select-input" />
+              </div>
+              <div class="toolbar-group">
+                <label for="end-date">结束日期</label>
+                <input id="end-date" type="date" class="select-input" />
+              </div>
+              <div class="toolbar-group">
+                <label for="window-size">视图跨度</label>
+                <select id="window-size" class="select-input">
+                  <option value="7">7 天</option>
+                  <option value="14" selected>14 天</option>
+                  <option value="21">21 天</option>
+                  <option value="30">30 天</option>
+                </select>
+              </div>
+            </div>
+            <div class="toolbar-controls gap-3">
+              <button id="apply-range" class="btn-primary">应用日期</button>
+              <button id="range-today" class="btn-secondary">回到今日</button>
+              <button id="range-prev" class="btn-secondary">向前一段</button>
+              <button id="range-next" class="btn-secondary">向后一段</button>
+              <span id="window-info" class="text-xs uppercase tracking-[0.25em] text-slate-400"></span>
+            </div>
           </div>
-
           <div id="legend" class="flex flex-wrap gap-3 text-xs text-slate-300"></div>
-        </section>
+        </header>
 
         <section class="schedule-card p-0">
           <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800/60 text-sm text-slate-300 shadow-inner-subtle">
@@ -297,7 +289,6 @@
       </main>
     </div>
 
-    <div id="toast" class="fixed top-6 inset-x-0 flex justify-center pointer-events-none z-50"></div>
     <div id="shift-popover" class="hidden fixed z-50"></div>
 
     <script>
@@ -338,6 +329,9 @@
         if (!view) return true;
         if (!user) return false;
         const normalizedView = String(view).toLowerCase();
+        if (normalizedView === 'home') {
+          return true;
+        }
         if (normalizedView === 'admin' && String(user.role || '').toLowerCase() !== 'admin') {
           return false;
         }
@@ -386,7 +380,6 @@
         windowBack: document.getElementById('window-back'),
         windowForward: document.getElementById('window-forward'),
         emptyState: document.getElementById('empty-state'),
-        toast: document.getElementById('toast'),
         popover: document.getElementById('shift-popover'),
       };
 
@@ -411,7 +404,7 @@
           elements.userName.textContent = data.user.display_name || '';
           applyViewVisibility(state.user);
           if (!userCanAccessView(state.user, CURRENT_VIEW)) {
-            showToast('无权访问该视图');
+            App.toast('无权访问该视图');
             setTimeout(() => {
               window.location.href = '/public/index.html';
             }, 800);
@@ -424,7 +417,8 @@
         }
       }
 
-      document.addEventListener('DOMContentLoaded', async () => {
+      App.ready(async () => {
+        App.initSidebar({ activeView: 'schedule' });
         attachEventListeners();
         const allowed = await ensureLoggedIn();
         if (!allowed) {
@@ -444,11 +438,11 @@
           const startValue = (elements.startInput.value || '').trim();
           const endValue = (elements.endInput.value || '').trim();
           if (!startValue || !endValue) {
-            showToast('请选择起止日期');
+            App.toast('请选择起止日期');
             return;
           }
           if (new Date(startValue) > new Date(endValue)) {
-            showToast('结束日期不能早于开始日期');
+            App.toast('结束日期不能早于开始日期');
             return;
           }
           state.start = startValue;
@@ -538,66 +532,71 @@
       async function loadScheduleData(options = {}) {
         teardownSSE();
         if (!userCanAccessView(state.user, CURRENT_VIEW)) {
-          showToast('无权访问该视图');
+          App.toast('无权访问该视图');
           return;
         }
-        const params = new URLSearchParams();
-        if (state.teamId) {
-          params.set('team_id', String(state.teamId));
-        }
-        if (state.start) {
-          params.set('start', state.start);
-        }
-        if (state.end) {
-          params.set('end', state.end);
-        }
-
-        const url = params.toString() ? `/api/schedule.php?${params}` : '/api/schedule.php';
-
-        let response;
+        App.showLoading('正在加载排班数据…');
         try {
-          response = await fetch(url, { credentials: 'include' });
-        } catch (error) {
-          showToast('网络异常，无法加载排班');
-          return;
+          const params = new URLSearchParams();
+          if (state.teamId) {
+            params.set('team_id', String(state.teamId));
+          }
+          if (state.start) {
+            params.set('start', state.start);
+          }
+          if (state.end) {
+            params.set('end', state.end);
+          }
+
+          const url = params.toString() ? `/api/schedule.php?${params}` : '/api/schedule.php';
+
+          let response;
+          try {
+            response = await fetch(url, { credentials: 'include' });
+          } catch (error) {
+            App.toast('网络异常，无法加载排班');
+            return;
+          }
+
+          if (response.status === 401) {
+            window.location.href = '/public/login.html';
+            return;
+          }
+
+          const data = await response.json().catch(() => null);
+          if (!response.ok || !data || !data.ok) {
+            const message = data && (data.error || data.msg);
+            App.toast(message || '加载排班失败');
+            return;
+          }
+
+          state.user = data.user || state.user;
+          state.teams = Array.isArray(data.teams) ? data.teams : [];
+          state.teamId = data.team_id ? Number(data.team_id) : null;
+          state.start = data.start || state.start;
+          state.end = data.end || state.end;
+          state.employees = Array.isArray(data.employees) ? data.employees : [];
+          state.canEdit = Boolean(data.can_edit);
+          state.shiftOptions = Array.isArray(data.shift_options) ? data.shift_options : [];
+          state.days = buildDays(state.start, state.end);
+          state.cells = parseCells(data.cells || {});
+          pendingUpdates.clear();
+
+          if (!options.preserveWindow) {
+            state.windowStart = 0;
+          }
+          adjustWindowBounds();
+
+          updateHeader();
+          renderTeamOptions();
+          updateDateInputs();
+          renderLegend();
+          updateWindowInfo();
+          renderTable();
+          connectSSE();
+        } finally {
+          App.hideLoading();
         }
-
-        if (response.status === 401) {
-          window.location.href = '/public/login.html';
-          return;
-        }
-
-        const data = await response.json().catch(() => null);
-        if (!response.ok || !data || !data.ok) {
-          const message = data && (data.error || data.msg);
-          showToast(message || '加载排班失败');
-          return;
-        }
-
-        state.user = data.user || state.user;
-        state.teams = Array.isArray(data.teams) ? data.teams : [];
-        state.teamId = data.team_id ? Number(data.team_id) : null;
-        state.start = data.start || state.start;
-        state.end = data.end || state.end;
-        state.employees = Array.isArray(data.employees) ? data.employees : [];
-        state.canEdit = Boolean(data.can_edit);
-        state.shiftOptions = Array.isArray(data.shift_options) ? data.shift_options : [];
-        state.days = buildDays(state.start, state.end);
-        state.cells = parseCells(data.cells || {});
-        pendingUpdates.clear();
-
-        if (!options.preserveWindow) {
-          state.windowStart = 0;
-        }
-        adjustWindowBounds();
-
-        updateHeader();
-        renderTeamOptions();
-        updateDateInputs();
-        renderLegend();
-        updateWindowInfo();
-        renderTable();
-        connectSSE();
       }
 
       function teardownSSE() {
@@ -753,7 +752,7 @@
           const isSelf =
             state.user && actorId !== null && Number.isFinite(actorId) && Number(state.user.id || 0) === actorId;
           if (!isSelf && version >= (pending.expectedVersion || 0)) {
-            showToast('该单元格已被他人更新', 'error');
+            App.toast('该单元格已被他人更新', 'error');
           }
           pendingUpdates.delete(key);
         }
@@ -1147,7 +1146,7 @@
           pendingUpdates.delete(key);
           cell.dataset.pending = '0';
           updateCellElement(cell, previousCell);
-          showToast('网络异常，保存失败');
+          App.toast('网络异常，保存失败');
           return;
         }
 
@@ -1172,14 +1171,14 @@
             } else {
               updateCellElement(cell, existing);
             }
-            showToast('存在新版本，请刷新后重试');
+            App.toast('存在新版本，请刷新后重试');
             return;
           }
 
           state.cells.set(key, previousCell);
           updateCellElement(cell, previousCell);
         const message = data && (data.error || data.msg) ? (data.error || data.msg) : '保存失败';
-        showToast(message);
+        App.toast(message);
           return;
         }
 
@@ -1198,7 +1197,7 @@
         pendingUpdates.delete(key);
         cell.dataset.pending = '0';
         updateCellElement(cell, updatedCell);
-        showToast('已更新班次', 'success');
+        App.toast('已更新班次', 'success');
       }
 
       function updateCellElement(cell, cellData) {
@@ -1232,6 +1231,9 @@
           cell.title = `版本 ${cellData.version || 0} · ${cellData.updated_at} · ${updater}`;
         } else {
           cell.title = '';
+        }
+        if (inner) {
+          App.flash(inner);
         }
       }
 
@@ -1285,20 +1287,6 @@
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
-      }
-
-      function showToast(message, type = 'error') {
-        elements.toast.innerHTML = '';
-        const wrapper = document.createElement('div');
-        wrapper.className = `pointer-events-auto px-4 py-2 rounded-xl shadow-lg text-sm font-medium ${
-          type === 'success' ? 'bg-emerald-500/90 text-white' : 'bg-rose-500/90 text-white'
-        }`;
-        wrapper.textContent = message;
-        elements.toast.appendChild(wrapper);
-        setTimeout(() => {
-          wrapper.classList.add('opacity-0', 'transition', 'duration-300');
-          setTimeout(() => wrapper.remove(), 300);
-        }, 2500);
       }
 
       window.addEventListener('beforeunload', () => {

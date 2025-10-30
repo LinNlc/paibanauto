@@ -6,40 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>排班助手 - 登录</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/public/css/app.css" />
-    <style>
-      body {
-        background: linear-gradient(-45deg, #0f172a, #1e293b, #0b1120, #111827);
-        background-size: 400% 400%;
-        animation: gradientFlow 12s ease infinite;
-      }
-
-      @keyframes gradientFlow {
-        0% {
-          background-position: 0% 50%;
-        }
-        50% {
-          background-position: 100% 50%;
-        }
-        100% {
-          background-position: 0% 50%;
-        }
-      }
-
-      .login-card {
-        background-color: rgba(15, 23, 42, 0.85);
-        backdrop-filter: blur(20px);
-        border: 1px solid rgba(148, 163, 184, 0.15);
-        box-shadow: 0 24px 48px rgba(15, 23, 42, 0.45);
-      }
-    </style>
+    <link rel="stylesheet" href="/public/app.css" />
+    <script src="/public/app.js"></script>
   </head>
-  <body class="min-h-screen flex items-center justify-center text-slate-100">
-    <div class="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-      <div class="absolute -top-32 -left-16 w-64 h-64 bg-sky-500/20 rounded-full blur-3xl"></div>
-      <div class="absolute bottom-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl"></div>
-    </div>
+  <body class="login-page min-h-screen flex items-center justify-center text-slate-100">
     <div class="relative z-10 w-full max-w-md mx-auto px-6">
       <div class="login-card rounded-3xl p-8 space-y-6">
         <div class="text-center space-y-2">
@@ -57,7 +27,7 @@
               autocomplete="username"
               placeholder="请输入账号"
               required
-              class="w-full rounded-xl border border-slate-700/60 bg-slate-900/80 px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              class="w-full"
             />
           </div>
           <div class="space-y-2">
@@ -69,86 +39,69 @@
               autocomplete="current-password"
               placeholder="请输入密码"
               required
-              class="w-full rounded-xl border border-slate-700/60 bg-slate-900/80 px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              class="w-full"
             />
           </div>
           <button
             id="submit-btn"
             type="submit"
-            class="w-full py-3 rounded-xl bg-sky-500 hover:bg-sky-400 transition-colors text-white font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-sky-400"
+            class="btn-primary w-full flex items-center justify-center gap-2"
           >
-            登录
+            <span>登录</span>
           </button>
         </form>
         <p class="text-xs text-center text-slate-500">默认账号 admin / admin，安装完成后请尽快修改。</p>
       </div>
     </div>
-    <div id="toast" class="fixed top-6 inset-x-0 flex justify-center pointer-events-none"></div>
     <script>
-      const toastEl = document.getElementById('toast');
-      const formEl = document.getElementById('login-form');
-      const submitBtn = document.getElementById('submit-btn');
+      App.ready(() => {
+        const formEl = document.getElementById('login-form');
+        const submitBtn = document.getElementById('submit-btn');
 
-      function showToast(message, type = 'error') {
-        toastEl.innerHTML = '';
-        const wrapper = document.createElement('div');
-        wrapper.className = `pointer-events-auto px-4 py-2 rounded-xl shadow-lg text-sm font-medium ${
-          type === 'success' ? 'bg-emerald-500/90 text-white' : 'bg-rose-500/90 text-white'
-        }`;
-        wrapper.textContent = message;
-        toastEl.appendChild(wrapper);
-        setTimeout(() => {
-          if (toastEl.contains(wrapper)) {
-            wrapper.classList.add('opacity-0', 'transition', 'duration-300');
-            setTimeout(() => wrapper.remove(), 300);
-          }
-        }, 3000);
-      }
+        formEl.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const username = (document.getElementById('username').value || '').trim();
+          const password = document.getElementById('password').value || '';
 
-      async function handleLogin(event) {
-        event.preventDefault();
-        const username = (document.getElementById('username').value || '').trim();
-        const password = document.getElementById('password').value || '';
-
-        if (!username || !password) {
-          showToast('请输入账号和密码');
-          return;
-        }
-
-        submitBtn.disabled = true;
-        submitBtn.textContent = '登录中...';
-
-        try {
-          const response = await fetch('/api/auth.php?action=login', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify({ username, password }),
-          });
-
-          const data = await response.json().catch(() => null);
-
-          if (!response.ok || !data || !data.ok) {
-            const message = (data && data.error) || '登录失败，请稍后再试';
-            showToast(message);
+          if (!username || !password) {
+            App.toast('请输入账号和密码');
             return;
           }
 
-          showToast('登录成功，即将跳转...', 'success');
-          setTimeout(() => {
-            window.location.href = '/public/index.html';
-          }, 500);
-        } catch (error) {
-          showToast('网络异常，请稍后再试');
-        } finally {
-          submitBtn.disabled = false;
-          submitBtn.textContent = '登录';
-        }
-      }
+          submitBtn.disabled = true;
+          submitBtn.classList.add('opacity-70');
+          submitBtn.innerHTML = '<span class="animate-pulse">登录中…</span>';
 
-      formEl.addEventListener('submit', handleLogin);
+          try {
+            const response = await fetch('/api/auth.php?action=login', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+              body: JSON.stringify({ username, password }),
+            });
+
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data || !data.ok) {
+              const message = (data && (data.msg || data.error)) || '登录失败，请稍后再试';
+              App.toast(message);
+              return;
+            }
+
+            App.toast('登录成功，即将跳转…', { type: 'success', duration: 1600 });
+            setTimeout(() => {
+              window.location.href = '/public/index.html';
+            }, 600);
+          } catch (error) {
+            App.toast('网络异常，请稍后再试');
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-70');
+            submitBtn.innerHTML = '<span>登录</span>';
+          }
+        });
+      });
     </script>
   </body>
 </html>

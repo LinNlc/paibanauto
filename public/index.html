@@ -8,12 +8,50 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/public/css/app.css" />
+    <link rel="stylesheet" href="/public/app.css" />
+    <script src="/public/app.js"></script>
+  </head>
+  <body>
+    <button type="button" class="app-sidebar-toggle" data-sidebar-toggle aria-label="展开菜单">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <div class="sidebar-inner">
+          <div class="sidebar-header">排班助手</div>
+          <nav>
+            <a href="/public/index.html" data-view="home" class="is-active"><span class="nav-indicator"></span>首页</a>
+            <a href="/public/people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
+            <a href="/public/schedule.html" data-view="schedule"><span class="nav-indicator"></span>排班表</a>
+            <a href="/public/stats.html" data-view="stats"><span class="nav-indicator"></span>数据统计</a>
+            <a href="/admin/index.html" data-view="admin"><span class="nav-indicator"></span>后台管理</a>
+          </nav>
+        </div>
+      </aside>
+      <main class="app-main">
+        <header class="app-header">
+          <div class="header-topline">
+            <div>
+              <h1 class="header-title">欢迎回来</h1>
+              <p class="header-subtitle">正在确认您的登录状态…</p>
+            </div>
+            <div class="text-sm text-slate-400">
+              当前用户：<span id="user-name" class="text-slate-200">-</span>
+            </div>
+          </div>
+        </header>
+        <section class="card-surface space-y-4 text-center">
+          <h2 id="status-text" class="text-2xl font-semibold">正在验证登录状态…</h2>
+          <p id="status-detail" class="text-slate-400">请稍候。</p>
+          <div class="pt-2 text-xs text-slate-500">完成验证后，可从左侧选择相应模块继续工作。</div>
+        </section>
+      </main>
+    </div>
     <script>
-      document.addEventListener('DOMContentLoaded', async () => {
-        const statusText = document.getElementById('status-text');
-        const detailText = document.getElementById('status-detail');
+      App.ready(async () => {
+        App.initSidebar({ activeView: 'home' });
 
         try {
           const response = await fetch('/api/auth.php?action=me', {
@@ -32,30 +70,27 @@
             return;
           }
 
-          statusText.textContent = `欢迎回来，${data.user.display_name}`;
-          detailText.textContent = '您已成功登录，可继续进行后续操作。';
+          const { user } = data;
+          document.getElementById('user-name').textContent = user.display_name || user.username;
+          document.getElementById('status-text').textContent = `欢迎回来，${user.display_name}`;
+          document.getElementById('status-detail').textContent = '请选择左侧模块开始排班或查看统计。';
+
+          const allowedViews = Array.isArray(user.allowed_views)
+            ? user.allowed_views
+            : Array.isArray(user.allowed_views_json)
+            ? user.allowed_views_json
+            : [];
+
+          document.querySelectorAll('.app-sidebar nav a[data-view]').forEach((link) => {
+            const view = link.dataset.view;
+            if (['people', 'schedule', 'stats', 'admin'].includes(view) && !allowedViews.includes(view) && user.role !== 'admin') {
+              link.classList.add('hidden');
+            }
+          });
         } catch (error) {
           window.location.href = '/public/login.html';
         }
       });
     </script>
-  </head>
-  <body class="bg-slate-950 text-slate-100">
-    <div class="site-shell">
-      <aside class="site-sidebar">
-        <div class="site-logo">排班助手</div>
-        <nav>
-          <a href="#">仪表盘</a>
-          <a href="#">排班表</a>
-          <a href="#">团队管理</a>
-        </nav>
-      </aside>
-      <main class="site-content flex items-center justify-center">
-        <div class="text-center space-y-4">
-          <h1 id="status-text" class="text-3xl font-bold tracking-wide">正在验证登录状态…</h1>
-          <p id="status-detail" class="text-slate-300">请稍候。</p>
-        </div>
-      </main>
-    </div>
   </body>
 </html>

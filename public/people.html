@@ -8,64 +8,57 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/public/css/app.css" />
+    <link rel="stylesheet" href="/public/app.css" />
+    <script src="/public/app.js"></script>
     <style>
       .dragging {
         opacity: 0.5;
       }
     </style>
   </head>
-  <body class="bg-slate-950 text-slate-100">
-    <div class="site-shell">
-      <aside class="site-sidebar">
-        <div class="site-logo">排班助手</div>
-        <nav>
-          <a href="/public/index.html">仪表盘</a>
-          <a href="/public/people.html" class="opacity-100" data-view="people">人员管理</a>
-          <a href="/public/schedule.html" data-view="schedule">排班表</a>
-          <a href="/public/stats.html" data-view="stats">数据统计</a>
-          <a href="/admin/index.html" data-view="admin">后台管理</a>
-        </nav>
+  <body>
+    <button type="button" class="app-sidebar-toggle" data-sidebar-toggle aria-label="展开菜单">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <div class="sidebar-inner">
+          <div class="sidebar-header">排班助手</div>
+          <nav>
+            <a href="/public/index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
+            <a href="/public/people.html" data-view="people" class="is-active"><span class="nav-indicator"></span>人员管理</a>
+            <a href="/public/schedule.html" data-view="schedule"><span class="nav-indicator"></span>排班表</a>
+            <a href="/public/stats.html" data-view="stats"><span class="nav-indicator"></span>数据统计</a>
+            <a href="/admin/index.html" data-view="admin"><span class="nav-indicator"></span>后台管理</a>
+          </nav>
+        </div>
       </aside>
-      <main class="site-content space-y-6">
-        <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 class="text-3xl font-semibold tracking-wide">人员管理</h1>
-            <p class="text-slate-400 text-sm">维护各团队成员，支持批量新增、排序与激活状态调整。</p>
+      <main class="app-main space-y-6">
+        <header class="app-header">
+          <div class="header-topline">
+            <div>
+              <h1 class="header-title">人员管理</h1>
+              <p class="header-subtitle">维护各团队成员，支持批量新增、排序与激活状态调整。</p>
+            </div>
+            <div class="text-sm text-slate-400">当前用户：<span id="user-name" class="text-slate-200"></span></div>
           </div>
-          <div class="text-sm text-slate-400">当前用户：<span id="user-name" class="text-slate-200"></span></div>
+          <div class="app-toolbar">
+            <div class="toolbar-group">
+              <label for="team-select">选择团队</label>
+              <select id="team-select" class="select-input"></select>
+            </div>
+            <div class="toolbar-controls">
+              <button id="bulk-add-btn" type="button" class="btn-primary">批量新增</button>
+              <button id="refresh-btn" type="button" class="btn-secondary">刷新</button>
+            </div>
+          </div>
         </header>
 
-        <section class="bg-slate-900/60 border border-slate-800/60 rounded-3xl p-6 shadow-xl space-y-4">
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div class="flex flex-col gap-2 w-full max-w-xs">
-              <label for="team-select" class="text-sm text-slate-400">选择团队</label>
-              <select
-                id="team-select"
-                class="w-full rounded-xl bg-slate-950/70 border border-slate-800 px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
-              ></select>
-            </div>
-            <div class="flex flex-wrap gap-3">
-              <button
-                id="bulk-add-btn"
-                type="button"
-                class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 transition disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                批量新增
-              </button>
-              <button
-                id="refresh-btn"
-                type="button"
-                class="px-4 py-2 rounded-xl border border-slate-700/70 text-slate-300 hover:bg-slate-800/80 transition"
-              >
-                刷新
-              </button>
-            </div>
-          </div>
-
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-800/70">
+        <section class="card-surface space-y-4">
+          <div class="table-scroll">
+            <table class="table-glass">
               <thead>
                 <tr class="text-left text-xs uppercase tracking-wider text-slate-400">
                   <th class="px-4 py-3 w-12"></th>
@@ -82,8 +75,6 @@
         </section>
       </main>
     </div>
-
-    <div id="toast" class="fixed top-6 inset-x-0 flex justify-center pointer-events-none z-50"></div>
 
     <div
       id="bulk-modal"
@@ -144,6 +135,9 @@
         if (!view) return true;
         if (!user) return false;
         const normalizedView = String(view).toLowerCase();
+        if (normalizedView === 'home') {
+          return true;
+        }
         if (normalizedView === 'admin' && String(user.role || '').toLowerCase() !== 'admin') {
           return false;
         }
@@ -168,7 +162,6 @@
         });
       }
 
-      const toastEl = document.getElementById('toast');
       const teamSelect = document.getElementById('team-select');
       const employeeBody = document.getElementById('employee-body');
       const emptyHint = document.getElementById('empty-hint');
@@ -179,7 +172,8 @@
       const bulkAddBtn = document.getElementById('bulk-add-btn');
       const refreshBtn = document.getElementById('refresh-btn');
 
-      document.addEventListener('DOMContentLoaded', async () => {
+      App.ready(async () => {
+        App.initSidebar({ activeView: 'people' });
         const allowed = await ensureLoggedIn();
         if (!allowed) {
           return;
@@ -195,7 +189,7 @@
 
       bulkAddBtn.addEventListener('click', () => {
         if (!state.canEdit || !state.teamId) {
-          showToast('当前不可批量新增', 'error');
+          App.toast('当前不可批量新增', 'error');
           return;
         }
         bulkNames.value = '';
@@ -205,7 +199,7 @@
 
       refreshBtn.addEventListener('click', async () => {
         await loadTeamData(state.teamId);
-        showToast('已刷新最新数据', 'success');
+        App.toast('已刷新最新数据', 'success');
       });
 
       bulkCancel.addEventListener('click', closeBulkModal);
@@ -218,12 +212,12 @@
       bulkForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (!state.canEdit || !state.teamId) {
-          showToast('无权执行批量新增', 'error');
+          App.toast('无权执行批量新增', 'error');
           return;
         }
         const names = bulkNames.value || '';
         if (!names.trim()) {
-          showToast('请输入至少一个姓名');
+          App.toast('请输入至少一个姓名');
           return;
         }
         const ok = await postEmployees({
@@ -233,7 +227,7 @@
         });
         if (ok) {
           closeBulkModal();
-          showToast('批量新增成功', 'success');
+          App.toast('批量新增成功', 'success');
           await loadTeamData(state.teamId);
         }
       });
@@ -261,7 +255,7 @@
           document.getElementById('user-name').textContent = data.user.display_name || '';
           applyViewVisibility(state.user);
           if (!userCanAccessView(state.user, CURRENT_VIEW)) {
-            showToast('无权访问该视图', 'error');
+            App.toast('无权访问该视图', 'error');
             setTimeout(() => {
               window.location.href = '/public/index.html';
             }, 800);
@@ -279,9 +273,10 @@
         state.isLoading = true;
         if (!userCanAccessView(state.user, CURRENT_VIEW)) {
           state.isLoading = false;
-          showToast('无权访问该视图', 'error');
+          App.toast('无权访问该视图', 'error');
           return;
         }
+        App.showLoading('正在加载员工数据…');
         try {
           const params = teamId ? `?team_id=${encodeURIComponent(teamId)}` : '';
           const response = await fetch(`/api/employees.php${params}`, {
@@ -295,7 +290,7 @@
           const data = await response.json().catch(() => null);
           if (!response.ok || !data || !data.ok) {
             const message = data && (data.error || data.msg);
-            showToast(message || '加载员工数据失败', 'error');
+            App.toast(message || '加载员工数据失败', 'error');
             return;
           }
           state.teams = Array.isArray(data.teams) ? data.teams : [];
@@ -305,9 +300,10 @@
           renderTeams();
           renderEmployees();
         } catch (error) {
-          showToast('网络异常，请稍后再试');
+          App.toast('网络异常，请稍后再试');
         } finally {
           state.isLoading = false;
+          App.hideLoading();
         }
       }
 
@@ -477,7 +473,7 @@
           order: ids,
         });
         if (ok) {
-          showToast('排序已更新', 'success');
+          App.toast('排序已更新', 'success');
           await loadTeamData(state.teamId);
         }
       }
@@ -489,7 +485,7 @@
           return;
         }
         if (!value) {
-          showToast('内容不能为空');
+          App.toast('内容不能为空');
           input.value = input.dataset.originalValue || '';
           return;
         }
@@ -498,7 +494,7 @@
         const ok = await postEmployees(payload);
         if (ok) {
           input.dataset.originalValue = value;
-          showToast('已保存修改', 'success');
+          App.toast('已保存修改', 'success');
         } else {
           await loadTeamData(state.teamId);
         }
@@ -508,7 +504,7 @@
         if (!state.canEdit) return;
         const ok = await postEmployees({ action: 'update', id, active });
         if (ok) {
-          showToast(active ? '已启用员工' : '已停用员工', 'success');
+          App.toast(active ? '已启用员工' : '已停用员工', 'success');
         } else {
           await loadTeamData(state.teamId);
         }
@@ -521,7 +517,7 @@
         }
         const ok = await postEmployees({ action: 'delete', id });
         if (ok) {
-          showToast('员工已删除', 'success');
+          App.toast('员工已删除', 'success');
           await loadTeamData(state.teamId);
         }
       }
@@ -537,30 +533,16 @@
           const data = await response.json().catch(() => null);
           if (!response.ok || !data || !data.ok) {
             const message = data && (data.error || data.msg);
-            showToast(message || '操作失败，请稍后再试', 'error');
+            App.toast(message || '操作失败，请稍后再试', 'error');
             return false;
           }
           return true;
         } catch (error) {
-          showToast('网络异常，请稍后再试');
+          App.toast('网络异常，请稍后再试');
           return false;
         }
       }
 
-      function showToast(message, type = 'error') {
-        if (!message) return;
-        toastEl.innerHTML = '';
-        const wrapper = document.createElement('div');
-        wrapper.className = `pointer-events-auto px-4 py-2 rounded-xl shadow-lg text-sm font-medium ${
-          type === 'success' ? 'bg-emerald-500/90 text-white' : 'bg-rose-500/90 text-white'
-        }`;
-        wrapper.textContent = message;
-        toastEl.appendChild(wrapper);
-        setTimeout(() => {
-          wrapper.classList.add('opacity-0', 'transition', 'duration-300');
-          setTimeout(() => wrapper.remove(), 300);
-        }, 2800);
-      }
     </script>
   </body>
 </html>

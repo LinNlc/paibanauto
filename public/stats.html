@@ -9,91 +9,70 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/public/css/app.css" />
+    <link rel="stylesheet" href="/public/app.css" />
+    <script src="/public/app.js"></script>
   </head>
-  <body class="bg-slate-950 text-slate-100">
-    <div class="site-shell">
-      <aside class="site-sidebar">
-        <div class="site-logo">排班助手</div>
-        <nav>
-          <a href="/public/index.html">仪表盘</a>
-          <a href="/public/people.html" data-view="people">人员管理</a>
-          <a href="/public/schedule.html" data-view="schedule">排班表</a>
-          <a href="/public/stats.html" class="opacity-100" data-view="stats">数据统计</a>
-          <a href="/admin/index.html" data-view="admin">后台管理</a>
-        </nav>
+  <body>
+    <button type="button" class="app-sidebar-toggle" data-sidebar-toggle aria-label="展开菜单">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <div class="sidebar-inner">
+          <div class="sidebar-header">排班助手</div>
+          <nav>
+            <a href="/public/index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
+            <a href="/public/people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
+            <a href="/public/schedule.html" data-view="schedule"><span class="nav-indicator"></span>排班表</a>
+            <a href="/public/stats.html" data-view="stats" class="is-active"><span class="nav-indicator"></span>数据统计</a>
+            <a href="/admin/index.html" data-view="admin"><span class="nav-indicator"></span>后台管理</a>
+          </nav>
+        </div>
       </aside>
-      <main class="site-content space-y-6 pb-12">
-        <header class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div class="inline-flex items-center gap-2 text-sm text-slate-400">
-              <span class="px-3 py-1 rounded-full bg-slate-900/80 border border-slate-700/60">统计分析</span>
-              <span class="hidden sm:inline">班次与在岗情况</span>
+      <main class="app-main space-y-8 pb-12">
+        <header class="app-header">
+          <div class="header-topline">
+            <div>
+              <div class="inline-flex items-center gap-2 text-sm text-slate-400">
+                <span class="px-3 py-1 rounded-full border border-slate-700/60 bg-slate-900/70">统计分析</span>
+                <span class="hidden sm:inline">班次与在岗情况</span>
+              </div>
+              <h1 class="header-title mt-2">数据统计</h1>
+              <p class="header-subtitle">查看班次分布与人员在岗概况，辅助排班优化。</p>
             </div>
-            <h1 class="mt-2 text-3xl font-semibold tracking-wide">数据统计</h1>
-            <p class="text-slate-400 text-sm">查看各班次分布与人员在岗概况，辅助排班优化。</p>
+            <div class="text-sm text-slate-400">当前用户：<span id="user-name" class="text-slate-200 font-medium"></span></div>
           </div>
-          <div class="text-sm text-slate-400">当前用户：<span id="user-name" class="text-slate-200 font-medium"></span></div>
-        </header>
-
-        <section class="bg-slate-900/60 border border-slate-800/60 rounded-3xl p-6 shadow-xl space-y-6">
-          <div class="grid gap-4 lg:grid-cols-5">
-            <div class="flex flex-col gap-2">
-              <label for="team-select" class="text-sm text-slate-400">选择团队</label>
-              <select
-                id="team-select"
-                class="rounded-xl bg-slate-950/70 border border-slate-800 px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
-              ></select>
-            </div>
-            <div class="flex flex-col gap-2">
-              <label for="start-date" class="text-sm text-slate-400">起始日期</label>
-              <input
-                id="start-date"
-                type="date"
-                class="rounded-xl bg-slate-950/70 border border-slate-800 px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
-              />
-            </div>
-            <div class="flex flex-col gap-2">
-              <label for="end-date" class="text-sm text-slate-400">结束日期</label>
-              <input
-                id="end-date"
-                type="date"
-                class="rounded-xl bg-slate-950/70 border border-slate-800 px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
-              />
-            </div>
-            <div class="flex flex-col gap-2">
-              <label class="text-sm text-slate-400">操作</label>
-              <div class="flex flex-wrap gap-3">
-                <button
-                  id="apply-range"
-                  type="button"
-                  class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 transition disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  应用筛选
-                </button>
-                <button
-                  id="refresh-btn"
-                  type="button"
-                  class="px-4 py-2 rounded-xl border border-slate-700/70 text-slate-300 hover:bg-slate-800/80 transition"
-                >
-                  刷新
-                </button>
+          <div class="app-toolbar">
+            <div class="toolbar-controls flex-wrap gap-4">
+              <div class="toolbar-group min-w-[160px]">
+                <label for="team-select">选择团队</label>
+                <select id="team-select" class="select-input"></select>
+              </div>
+              <div class="toolbar-group">
+                <label for="start-date">起始日期</label>
+                <input id="start-date" type="date" class="select-input" />
+              </div>
+              <div class="toolbar-group">
+                <label for="end-date">结束日期</label>
+                <input id="end-date" type="date" class="select-input" />
+              </div>
+              <div class="toolbar-group">
+                <label>白班目标</label>
+                <span id="white-target" class="px-3 py-2 rounded-xl border border-slate-700/60 bg-slate-900/70 text-sm">-</span>
               </div>
             </div>
-            <div class="flex flex-col gap-2">
-              <label class="text-sm text-slate-400">白班目标</label>
-              <div class="flex items-center gap-2 text-sm text-slate-300">
-                <span id="white-target" class="px-3 py-2 rounded-xl bg-slate-950/70 border border-slate-800">-</span>
-                <span class="text-slate-500">月均 ≥ 目标</span>
-              </div>
+            <div class="toolbar-controls gap-3">
+              <button id="apply-range" type="button" class="btn-primary">应用筛选</button>
+              <button id="refresh-btn" type="button" class="btn-secondary">刷新</button>
             </div>
           </div>
-
           <div class="flex flex-wrap gap-3 text-sm text-slate-300">
-            <span id="range-info" class="px-3 py-1.5 rounded-full bg-slate-900/70 border border-slate-800/60"></span>
-            <span id="team-info" class="px-3 py-1.5 rounded-full bg-slate-900/70 border border-slate-800/60"></span>
+            <span id="range-info" class="px-3 py-1.5 rounded-full border border-slate-800/60 bg-slate-900/70"></span>
+            <span id="team-info" class="px-3 py-1.5 rounded-full border border-slate-800/60 bg-slate-900/70"></span>
           </div>
-        </section>
+        </header>
 
         <section class="bg-slate-900/60 border border-slate-800/60 rounded-3xl p-6 shadow-2xl space-y-6">
           <div class="flex flex-wrap gap-3">
@@ -173,8 +152,6 @@
       </main>
     </div>
 
-    <div id="toast" class="fixed top-6 inset-x-0 flex justify-center pointer-events-none z-50"></div>
-
     <script>
       const state = {
         user: null,
@@ -207,6 +184,9 @@
         if (!view) return true;
         if (!user) return false;
         const normalizedView = String(view).toLowerCase();
+        if (normalizedView === 'home') {
+          return true;
+        }
         if (normalizedView === 'admin' && String(user.role || '').toLowerCase() !== 'admin') {
           return false;
         }
@@ -246,7 +226,6 @@
       const personContainer = document.getElementById('person-container');
       const coverageContainer = document.getElementById('coverage-container');
 
-      const toastRoot = document.getElementById('toast');
 
       tabPerson.addEventListener('click', () => switchTab('person'));
       tabCoverage.addEventListener('click', () => switchTab('coverage'));
@@ -292,7 +271,7 @@
           document.getElementById('user-name').textContent = data.user.display_name || '';
           applyViewVisibility(state.user);
           if (!userCanAccessView(state.user, CURRENT_VIEW)) {
-            showToast('无权访问该视图');
+            App.toast('无权访问该视图');
             setTimeout(() => {
               window.location.href = '/public/index.html';
             }, 800);
@@ -324,11 +303,12 @@
 
       async function loadPersonStats(force = false) {
         if (!userCanAccessView(state.user, CURRENT_VIEW)) {
-          showToast('无权访问该视图');
+          App.toast('无权访问该视图');
           return;
         }
         if (state.isLoading && !force) return;
         state.isLoading = true;
+        App.showLoading('正在加载统计数据…');
         try {
           const params = buildParams('by_person');
           const response = await fetch(`/api/stats.php?${params.toString()}`, {
@@ -340,13 +320,13 @@
             return;
           }
           if (response.status === 403) {
-            showToast('无权访问统计数据');
+            App.toast('无权访问统计数据');
             return;
           }
           const data = await response.json().catch(() => null);
           if (!response.ok || !data || !data.ok) {
             const message = data && (data.error || data.msg);
-            showToast(message || '加载统计数据失败');
+            App.toast(message || '加载统计数据失败');
             return;
           }
           state.teams = Array.isArray(data.teams) ? data.teams : [];
@@ -368,9 +348,10 @@
             await loadCoverageStats(true);
           }
         } catch (error) {
-          showToast('网络异常，请稍后再试');
+          App.toast('网络异常，请稍后再试');
         } finally {
           state.isLoading = false;
+          App.hideLoading();
         }
       }
 
@@ -387,6 +368,7 @@
           renderCoverage();
           return;
         }
+        App.showLoading('正在加载在岗数据…');
         try {
           const params = buildParams('coverage_by_day');
           const response = await fetch(`/api/stats.php?${params.toString()}`, {
@@ -398,20 +380,22 @@
             return;
           }
           if (response.status === 403) {
-            showToast('无权访问在岗分析');
+            App.toast('无权访问在岗分析');
             return;
           }
           const data = await response.json().catch(() => null);
           if (!response.ok || !data || !data.ok) {
             const message = data && (data.error || data.msg);
-            showToast(message || '加载在岗数据失败');
+            App.toast(message || '加载在岗数据失败');
             return;
           }
           state.coverageDaily = Array.isArray(data.daily) ? data.daily : [];
           state.coverageKey = key;
           renderCoverage();
         } catch (error) {
-          showToast('网络异常，请稍后再试');
+          App.toast('网络异常，请稍后再试');
+        } finally {
+          App.hideLoading();
         }
       }
 
@@ -734,18 +718,10 @@
         }
       }
 
-      function showToast(message) {
-        const toast = document.createElement('div');
-        toast.className = 'pointer-events-auto bg-slate-900/95 border border-slate-700/70 text-slate-100 px-4 py-2 rounded-xl shadow-lg transition-opacity';
-        toast.textContent = message;
-        toastRoot.appendChild(toast);
-        setTimeout(() => {
-          toast.classList.add('opacity-0');
-          setTimeout(() => toast.remove(), 300);
-        }, 2600);
-      }
-
-      init();
+      App.ready(() => {
+        App.initSidebar({ activeView: 'stats' });
+        init();
+      });
     </script>
   </body>
 </html>
