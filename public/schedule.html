@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>排班助手 - 排班表</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/public/css/app.css" />
+    <style>
+      :root {
+        --schedule-date-width: 140px;
+        --schedule-week-width: 90px;
+      }
+
+      .schedule-card {
+        background: rgba(15, 23, 42, 0.72);
+        border: 1px solid rgba(71, 85, 105, 0.2);
+        border-radius: 1.5rem;
+        box-shadow: 0 24px 48px rgba(15, 23, 42, 0.45);
+      }
+
+      .schedule-table {
+        border-collapse: separate;
+        border-spacing: 0;
+        min-width: 100%;
+      }
+
+      .schedule-table th,
+      .schedule-table td {
+        border-right: 1px solid rgba(148, 163, 184, 0.08);
+        border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+        padding: 0.75rem 0.75rem;
+        min-width: 120px;
+        background: rgba(15, 23, 42, 0.75);
+      }
+
+      .schedule-table th:last-child,
+      .schedule-table td:last-child {
+        border-right: none;
+      }
+
+      .schedule-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        background: rgba(30, 41, 59, 0.92);
+        backdrop-filter: blur(6px);
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        letter-spacing: 0.08em;
+      }
+
+      .sticky-col-1 {
+        position: sticky;
+        left: 0;
+        z-index: 28;
+        width: var(--schedule-date-width);
+        min-width: var(--schedule-date-width);
+        background: rgba(30, 41, 59, 0.95) !important;
+        backdrop-filter: blur(6px);
+      }
+
+      .sticky-col-2 {
+        position: sticky;
+        left: var(--schedule-date-width);
+        z-index: 27;
+        width: var(--schedule-week-width);
+        min-width: var(--schedule-week-width);
+        background: rgba(30, 41, 59, 0.92) !important;
+        backdrop-filter: blur(6px);
+      }
+
+      .schedule-table tbody td.sticky-col-1,
+      .schedule-table tbody td.sticky-col-2 {
+        background: rgba(15, 23, 42, 0.96) !important;
+        box-shadow: inset -1px 0 0 rgba(148, 163, 184, 0.06);
+      }
+
+      .schedule-table tbody tr:nth-child(even) td {
+        background: rgba(15, 23, 42, 0.82);
+      }
+
+      .schedule-cell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        border-radius: 0.85rem;
+        transition: all 0.15s ease;
+        font-weight: 500;
+      }
+
+      .schedule-cell.empty {
+        color: rgba(148, 163, 184, 0.6);
+        font-weight: 400;
+      }
+
+      .schedule-cell.interactive {
+        cursor: pointer;
+      }
+
+      .schedule-cell.interactive:hover {
+        box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.4);
+        background: rgba(56, 189, 248, 0.08);
+      }
+
+      .shift-white {
+        background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(59, 130, 246, 0.14));
+        color: #bae6fd;
+        box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.35);
+      }
+
+      .shift-mid1 {
+        background: linear-gradient(135deg, rgba(129, 140, 248, 0.18), rgba(14, 116, 144, 0.18));
+        color: #c7d2fe;
+        box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.35);
+      }
+
+      .shift-mid2 {
+        background: linear-gradient(135deg, rgba(244, 114, 182, 0.18), rgba(236, 72, 153, 0.12));
+        color: #fbcfe8;
+        box-shadow: inset 0 0 0 1px rgba(244, 114, 182, 0.35);
+      }
+
+      .shift-night {
+        background: linear-gradient(135deg, rgba(14, 116, 144, 0.22), rgba(6, 78, 59, 0.18));
+        color: #99f6e4;
+        box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.32);
+      }
+
+      .shift-rest {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(74, 222, 128, 0.12));
+        color: #bbf7d0;
+        box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.32);
+      }
+
+      .schedule-cell.disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      #shift-popover {
+        min-width: 160px;
+        background: rgba(15, 23, 42, 0.98);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        border-radius: 1rem;
+        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.45);
+        padding: 0.75rem;
+      }
+
+      #shift-popover button {
+        width: 100%;
+        text-align: left;
+        padding: 0.45rem 0.75rem;
+        border-radius: 0.75rem;
+        transition: background 0.15s ease, transform 0.1s ease;
+      }
+
+      #shift-popover button:hover {
+        background: rgba(56, 189, 248, 0.18);
+        transform: translateX(2px);
+      }
+
+      #shift-popover button[data-value=""] {
+        color: rgba(248, 113, 113, 0.9);
+      }
+
+      .legend-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.35rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        background: rgba(30, 41, 59, 0.9);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+      }
+
+      .legend-color {
+        width: 10px;
+        height: 10px;
+        border-radius: 9999px;
+        margin-right: 0.4rem;
+      }
+
+      .shadow-inner-subtle {
+        box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.12);
+      }
+    </style>
+  </head>
+  <body class="bg-slate-950 text-slate-100">
+    <div class="site-shell">
+      <aside class="site-sidebar">
+        <div class="site-logo">排班助手</div>
+        <nav>
+          <a href="/public/index.html">仪表盘</a>
+          <a href="/public/people.html">人员管理</a>
+          <a href="/public/schedule.html" class="opacity-100">排班表</a>
+          <a href="/admin/index.html">后台管理</a>
+        </nav>
+      </aside>
+      <main class="site-content space-y-6 pb-12">
+        <header class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div class="inline-flex items-center gap-2 text-sm text-slate-400">
+              <span class="px-3 py-1 rounded-full bg-slate-900/80 border border-slate-700/60">排班中心</span>
+              <span class="hidden sm:inline">核心视图</span>
+            </div>
+            <h1 class="mt-2 text-3xl font-semibold tracking-wide">排班日历</h1>
+            <p class="text-slate-400 text-sm">查看并维护团队排班安排，支持快速切换日期与班次。</p>
+          </div>
+          <div class="flex flex-col items-start gap-2 text-sm text-slate-400 sm:items-end">
+            <div>当前用户：<span id="user-name" class="text-slate-200 font-medium"></span></div>
+            <div id="edit-state" class="inline-flex items-center gap-2 text-xs px-3 py-1 rounded-full border border-slate-700/70 text-slate-300"></div>
+          </div>
+        </header>
+
+        <section class="schedule-card p-6 space-y-5">
+          <div class="grid gap-4 lg:grid-cols-4">
+            <div class="flex flex-col gap-2">
+              <label for="team-select" class="text-sm text-slate-400">选择团队</label>
+              <select
+                id="team-select"
+                class="rounded-xl bg-slate-950/70 border border-slate-800 px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              ></select>
+            </div>
+            <div class="flex flex-col gap-2">
+              <label class="text-sm text-slate-400" for="start-date">起始日期</label>
+              <input
+                id="start-date"
+                type="date"
+                class="rounded-xl bg-slate-950/70 border border-slate-800 px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
+            </div>
+            <div class="flex flex-col gap-2">
+              <label class="text-sm text-slate-400" for="end-date">结束日期</label>
+              <input
+                id="end-date"
+                type="date"
+                class="rounded-xl bg-slate-950/70 border border-slate-800 px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
+            </div>
+            <div class="flex flex-col gap-2">
+              <label class="text-sm text-slate-400" for="window-size">视图跨度</label>
+              <select
+                id="window-size"
+                class="rounded-xl bg-slate-950/70 border border-slate-800 px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              >
+                <option value="7">7 天</option>
+                <option value="14" selected>14 天</option>
+                <option value="21">21 天</option>
+                <option value="30">30 天</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3 text-sm">
+            <button id="apply-range" class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 transition text-white">应用日期</button>
+            <button id="range-today" class="px-4 py-2 rounded-xl border border-slate-700/70 text-slate-300 hover:bg-slate-800/70">回到今日</button>
+            <button id="range-prev" class="px-4 py-2 rounded-xl border border-slate-700/70 text-slate-300 hover:bg-slate-800/70">向前一段</button>
+            <button id="range-next" class="px-4 py-2 rounded-xl border border-slate-700/70 text-slate-300 hover:bg-slate-800/70">向后一段</button>
+            <span id="window-info" class="ml-auto text-xs uppercase tracking-[0.25em] text-slate-500"></span>
+          </div>
+
+          <div id="legend" class="flex flex-wrap gap-3 text-xs text-slate-300"></div>
+        </section>
+
+        <section class="schedule-card p-0">
+          <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800/60 text-sm text-slate-300 shadow-inner-subtle">
+            <span>排班详情</span>
+            <div class="flex items-center gap-3">
+              <button id="window-back" class="px-3 py-1.5 rounded-lg border border-slate-700/60 text-xs text-slate-300 hover:bg-slate-800/70">上一页</button>
+              <button id="window-forward" class="px-3 py-1.5 rounded-lg border border-slate-700/60 text-xs text-slate-300 hover:bg-slate-800/70">下一页</button>
+            </div>
+          </div>
+          <div id="schedule-wrapper" class="relative overflow-auto max-h-[70vh]">
+            <table class="schedule-table" aria-describedby="window-info">
+              <thead>
+                <tr id="schedule-head"></tr>
+              </thead>
+              <tbody id="schedule-body"></tbody>
+            </table>
+          </div>
+          <div id="empty-state" class="px-6 py-10 text-center text-sm text-slate-400 hidden">暂无员工或班次数据，请先选择其他团队或添加成员。</div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="fixed top-6 inset-x-0 flex justify-center pointer-events-none z-50"></div>
+    <div id="shift-popover" class="hidden fixed z-50"></div>
+
+    <script>
+      const WEEK_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
+      const SHIFT_STYLE = new Map([
+        ['白', 'shift-white'],
+        ['中1', 'shift-mid1'],
+        ['中2', 'shift-mid2'],
+        ['夜', 'shift-night'],
+        ['休息', 'shift-rest'],
+      ]);
+
+      const state = {
+        user: null,
+        teams: [],
+        teamId: null,
+        start: '',
+        end: '',
+        employees: [],
+        cells: new Map(),
+        canEdit: false,
+        shiftOptions: [],
+        days: [],
+        windowStart: 0,
+        windowSize: 14,
+      };
+
+      const elements = {
+        teamSelect: document.getElementById('team-select'),
+        startInput: document.getElementById('start-date'),
+        endInput: document.getElementById('end-date'),
+        windowSize: document.getElementById('window-size'),
+        applyRange: document.getElementById('apply-range'),
+        rangeToday: document.getElementById('range-today'),
+        rangePrev: document.getElementById('range-prev'),
+        rangeNext: document.getElementById('range-next'),
+        windowInfo: document.getElementById('window-info'),
+        userName: document.getElementById('user-name'),
+        editState: document.getElementById('edit-state'),
+        legend: document.getElementById('legend'),
+        scheduleHead: document.getElementById('schedule-head'),
+        scheduleBody: document.getElementById('schedule-body'),
+        scheduleWrapper: document.getElementById('schedule-wrapper'),
+        windowBack: document.getElementById('window-back'),
+        windowForward: document.getElementById('window-forward'),
+        emptyState: document.getElementById('empty-state'),
+        toast: document.getElementById('toast'),
+        popover: document.getElementById('shift-popover'),
+      };
+
+      let popoverContext = null;
+
+      document.addEventListener('DOMContentLoaded', () => {
+        attachEventListeners();
+        loadScheduleData();
+      });
+
+      function attachEventListeners() {
+        elements.teamSelect.addEventListener('change', () => {
+          const value = parseInt(elements.teamSelect.value, 10);
+          state.teamId = Number.isFinite(value) ? value : null;
+          loadScheduleData();
+        });
+
+        elements.applyRange.addEventListener('click', () => {
+          const startValue = (elements.startInput.value || '').trim();
+          const endValue = (elements.endInput.value || '').trim();
+          if (!startValue || !endValue) {
+            showToast('请选择起止日期');
+            return;
+          }
+          if (new Date(startValue) > new Date(endValue)) {
+            showToast('结束日期不能早于开始日期');
+            return;
+          }
+          state.start = startValue;
+          state.end = endValue;
+          state.windowStart = 0;
+          loadScheduleData({ preserveWindow: false });
+        });
+
+        elements.windowSize.addEventListener('change', () => {
+          const size = parseInt(elements.windowSize.value, 10);
+          if (Number.isFinite(size) && size > 0) {
+            state.windowSize = Math.min(size, 30);
+            adjustWindowBounds();
+            renderTable();
+            updateWindowInfo();
+          }
+        });
+
+        elements.rangeToday.addEventListener('click', () => {
+          const today = formatDate(new Date());
+          const endDate = formatDate(addDays(new Date(), state.windowSize - 1));
+          state.start = today;
+          state.end = endDate;
+          state.windowStart = 0;
+          loadScheduleData({ preserveWindow: false });
+        });
+
+        elements.rangePrev.addEventListener('click', () => {
+          shiftRange(-state.windowSize);
+        });
+
+        elements.rangeNext.addEventListener('click', () => {
+          shiftRange(state.windowSize);
+        });
+
+        elements.windowBack.addEventListener('click', () => {
+          if (state.windowStart <= 0) {
+            return;
+          }
+          state.windowStart = Math.max(0, state.windowStart - state.windowSize);
+          renderTable();
+          updateWindowInfo();
+        });
+
+        elements.windowForward.addEventListener('click', () => {
+          if (state.windowStart + state.windowSize >= state.days.length) {
+            return;
+          }
+          const maxStart = Math.max(0, state.days.length - state.windowSize);
+          state.windowStart = Math.min(maxStart, state.windowStart + state.windowSize);
+          renderTable();
+          updateWindowInfo();
+        });
+
+        elements.scheduleBody.addEventListener('click', (event) => {
+          const cell = event.target.closest('td[data-emp-id]');
+          if (!cell || !state.canEdit || cell.dataset.disabled === '1') {
+            return;
+          }
+          openPopover(cell);
+        });
+
+        document.addEventListener('click', (event) => {
+          if (!elements.popover.classList.contains('hidden')) {
+            if (!elements.popover.contains(event.target)) {
+              const cell = popoverContext?.cell;
+              if (cell && !cell.contains(event.target)) {
+                closePopover();
+              }
+            }
+          }
+        });
+
+        window.addEventListener('resize', () => {
+          if (!elements.popover.classList.contains('hidden') && popoverContext) {
+            positionPopover(popoverContext.cell);
+          }
+        });
+
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            closePopover();
+          }
+        });
+      }
+
+      async function loadScheduleData(options = {}) {
+        const params = new URLSearchParams();
+        if (state.teamId) {
+          params.set('team_id', String(state.teamId));
+        }
+        if (state.start) {
+          params.set('start', state.start);
+        }
+        if (state.end) {
+          params.set('end', state.end);
+        }
+
+        const url = params.toString() ? `/api/schedule.php?${params}` : '/api/schedule.php';
+
+        let response;
+        try {
+          response = await fetch(url, { credentials: 'include' });
+        } catch (error) {
+          showToast('网络异常，无法加载排班');
+          return;
+        }
+
+        if (response.status === 401) {
+          window.location.href = '/public/login.html';
+          return;
+        }
+
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data || !data.ok) {
+          showToast((data && data.error) || '加载排班失败');
+          return;
+        }
+
+        state.user = data.user || state.user;
+        state.teams = Array.isArray(data.teams) ? data.teams : [];
+        state.teamId = data.team_id ? Number(data.team_id) : null;
+        state.start = data.start || state.start;
+        state.end = data.end || state.end;
+        state.employees = Array.isArray(data.employees) ? data.employees : [];
+        state.canEdit = Boolean(data.can_edit);
+        state.shiftOptions = Array.isArray(data.shift_options) ? data.shift_options : [];
+        state.days = buildDays(state.start, state.end);
+        state.cells = parseCells(data.cells || {});
+
+        if (!options.preserveWindow) {
+          state.windowStart = 0;
+        }
+        adjustWindowBounds();
+
+        updateHeader();
+        renderTeamOptions();
+        updateDateInputs();
+        renderLegend();
+        updateWindowInfo();
+        renderTable();
+      }
+
+      function renderTeamOptions() {
+        elements.teamSelect.innerHTML = '';
+        if (state.teams.length === 0) {
+          const option = document.createElement('option');
+          option.textContent = '暂无可用团队';
+          option.value = '';
+          elements.teamSelect.appendChild(option);
+          elements.teamSelect.disabled = true;
+          return;
+        }
+
+        elements.teamSelect.disabled = false;
+        state.teams.forEach((team) => {
+          const teamId = Number(team.id);
+          const option = document.createElement('option');
+          option.value = String(teamId);
+          option.textContent = `${team.name || '未命名团队'} (#${teamId})`;
+          if (state.teamId === teamId) {
+            option.selected = true;
+          }
+          elements.teamSelect.appendChild(option);
+        });
+      }
+
+      function updateHeader() {
+        elements.userName.textContent = state.user ? state.user.display_name : '';
+        if (state.canEdit) {
+          elements.editState.textContent = '可编辑该团队排班';
+          elements.editState.classList.remove('bg-rose-500/20', 'text-rose-200');
+          elements.editState.classList.add('bg-emerald-500/15', 'text-emerald-200');
+        } else {
+          elements.editState.textContent = '只读视图，无权编辑';
+          elements.editState.classList.remove('bg-emerald-500/15', 'text-emerald-200');
+          elements.editState.classList.add('bg-rose-500/20', 'text-rose-200');
+        }
+      }
+
+      function renderLegend() {
+        elements.legend.innerHTML = '';
+        if (!state.shiftOptions || state.shiftOptions.length === 0) {
+          const empty = document.createElement('span');
+          empty.textContent = '当前未配置班次选项';
+          empty.className = 'text-slate-500';
+          elements.legend.appendChild(empty);
+          return;
+        }
+
+        state.shiftOptions.forEach((shift) => {
+          const badge = document.createElement('span');
+          badge.className = 'legend-badge';
+          const color = document.createElement('span');
+          color.className = 'legend-color';
+          color.style.background = getShiftColor(shift);
+          badge.appendChild(color);
+          badge.appendChild(document.createTextNode(shift));
+          elements.legend.appendChild(badge);
+        });
+      }
+
+      function parseCells(cells) {
+        const map = new Map();
+        const entries = Object.entries(cells || {});
+        entries.forEach(([day, dayCells]) => {
+          if (!dayCells || typeof dayCells !== 'object') return;
+          Object.entries(dayCells).forEach(([empKey, cell]) => {
+            const empId = parseInt(empKey, 10);
+            if (!Number.isFinite(empId)) return;
+            const version = cell && typeof cell.version !== 'undefined' ? Number(cell.version) : 0;
+            map.set(`${day}|${empId}`, {
+              value: cell && typeof cell.value === 'string' ? cell.value : '',
+              version: Number.isFinite(version) ? version : 0,
+              updated_at: cell && typeof cell.updated_at === 'string' ? cell.updated_at : null,
+              updated_by: cell && cell.updated_by ? cell.updated_by : null,
+            });
+          });
+        });
+        return map;
+      }
+
+      function buildDays(start, end) {
+        if (!start || !end) {
+          return [];
+        }
+        const days = [];
+        let cursor = new Date(`${start}T00:00:00`);
+        const endDate = new Date(`${end}T00:00:00`);
+        while (cursor <= endDate) {
+          const iso = formatDate(cursor);
+          days.push({
+            date: iso,
+            weekday: WEEK_NAMES[cursor.getDay()],
+            label: `${cursor.getMonth() + 1}月${cursor.getDate()}日`,
+          });
+          cursor = addDays(cursor, 1);
+        }
+        return days;
+      }
+
+      function renderTable() {
+        elements.scheduleHead.innerHTML = '';
+        elements.scheduleBody.innerHTML = '';
+
+        if (!state.teamId || state.employees.length === 0 || state.days.length === 0) {
+          elements.emptyState.classList.remove('hidden');
+          return;
+        }
+
+        elements.emptyState.classList.add('hidden');
+
+        const headRow = document.createElement('tr');
+        const dateTh = document.createElement('th');
+        dateTh.className = 'sticky-col-1 text-left text-xs tracking-[0.3em] text-slate-400';
+        dateTh.textContent = '日期';
+        headRow.appendChild(dateTh);
+
+        const weekTh = document.createElement('th');
+        weekTh.className = 'sticky-col-2 text-left text-xs tracking-[0.3em] text-slate-400';
+        weekTh.textContent = '星期';
+        headRow.appendChild(weekTh);
+
+        state.employees.forEach((emp) => {
+          const th = document.createElement('th');
+          th.textContent = emp.display_name || emp.name || `成员#${emp.id}`;
+          th.dataset.empId = emp.id;
+          th.title = emp.active ? '可排班' : '已停用';
+          if (!emp.active) {
+            th.classList.add('opacity-60');
+          }
+          headRow.appendChild(th);
+        });
+
+        elements.scheduleHead.appendChild(headRow);
+
+        adjustWindowBounds();
+        const endIndex = Math.min(state.windowStart + state.windowSize, state.days.length);
+        const visibleDays = state.days.slice(state.windowStart, endIndex);
+
+        const fragment = document.createDocumentFragment();
+        visibleDays.forEach((day) => {
+          const tr = document.createElement('tr');
+
+          const dateTd = document.createElement('td');
+          dateTd.className = 'sticky-col-1 font-medium text-slate-200';
+          dateTd.textContent = day.label;
+          dateTd.dataset.day = day.date;
+          tr.appendChild(dateTd);
+
+          const weekTd = document.createElement('td');
+          weekTd.className = 'sticky-col-2 text-slate-400';
+          weekTd.textContent = `周${day.weekday}`;
+          tr.appendChild(weekTd);
+
+          state.employees.forEach((emp) => {
+            const td = document.createElement('td');
+            td.dataset.empId = String(emp.id);
+            td.dataset.day = day.date;
+            td.dataset.disabled = !state.canEdit || !emp.active ? '1' : '0';
+
+            const cellKey = `${day.date}|${emp.id}`;
+            const cellData = state.cells.get(cellKey) || { value: '', version: 0 };
+            td.dataset.version = String(cellData.version || 0);
+            td.dataset.value = cellData.value || '';
+
+            const inner = document.createElement('div');
+            inner.className = 'schedule-cell';
+            if (state.canEdit && emp.active) {
+              inner.classList.add('interactive');
+            }
+            if (!emp.active) {
+              inner.classList.add('disabled');
+            }
+
+            if (cellData.value) {
+              inner.textContent = cellData.value;
+              const shiftClass = getShiftClass(cellData.value);
+              if (shiftClass) {
+                inner.classList.add(shiftClass);
+              }
+            } else {
+              inner.textContent = '—';
+              inner.classList.add('empty');
+            }
+
+            if (cellData.updated_at) {
+              const updater = cellData.updated_by && cellData.updated_by.display_name ? cellData.updated_by.display_name : '未知';
+              td.title = `版本 ${cellData.version} · ${cellData.updated_at} · ${updater}`;
+            } else {
+              td.title = '';
+            }
+
+            td.appendChild(inner);
+            tr.appendChild(td);
+          });
+
+          fragment.appendChild(tr);
+        });
+
+        elements.scheduleBody.appendChild(fragment);
+      }
+
+      function adjustWindowBounds() {
+        if (state.windowSize <= 0 || !Number.isFinite(state.windowSize)) {
+          state.windowSize = parseInt(elements.windowSize.value, 10) || 14;
+        }
+        state.windowSize = Math.min(Math.max(state.windowSize, 1), 30);
+        if (state.windowStart + state.windowSize > state.days.length) {
+          state.windowStart = Math.max(0, state.days.length - state.windowSize);
+        }
+        if (state.windowStart < 0) {
+          state.windowStart = 0;
+        }
+      }
+
+      function updateDateInputs() {
+        if (state.start) {
+          elements.startInput.value = state.start;
+        }
+        if (state.end) {
+          elements.endInput.value = state.end;
+        }
+      }
+
+      function updateWindowInfo() {
+        if (!state.days.length) {
+          elements.windowInfo.textContent = '';
+          return;
+        }
+        const startIndex = state.windowStart + 1;
+        const endIndex = Math.min(state.windowStart + state.windowSize, state.days.length);
+        elements.windowInfo.textContent = `显示第 ${startIndex} - ${endIndex} 天，共 ${state.days.length} 天`;
+      }
+
+      function shiftRange(delta) {
+        if (!state.start || !state.end) {
+          return;
+        }
+        const startDate = addDays(new Date(`${state.start}T00:00:00`), delta);
+        const endDate = addDays(new Date(`${state.end}T00:00:00`), delta);
+        state.start = formatDate(startDate);
+        state.end = formatDate(endDate);
+        state.windowStart = 0;
+        loadScheduleData({ preserveWindow: false });
+      }
+
+      function openPopover(cell) {
+        const day = cell.dataset.day;
+        const empId = parseInt(cell.dataset.empId, 10);
+        if (!day || !Number.isFinite(empId)) {
+          return;
+        }
+        const key = `${day}|${empId}`;
+        const cellData = state.cells.get(key) || { value: '', version: 0 };
+
+        elements.popover.innerHTML = '';
+
+        const title = document.createElement('div');
+        title.className = 'text-xs text-slate-400 pb-2 border-b border-slate-800/60 mb-2';
+        title.textContent = `${day} · ${getEmployeeName(empId)}`;
+        elements.popover.appendChild(title);
+
+        const list = document.createElement('div');
+        list.className = 'space-y-1';
+
+        if (state.shiftOptions.length === 0) {
+          const hint = document.createElement('div');
+          hint.className = 'text-xs text-slate-500 px-1';
+          hint.textContent = '尚未配置班次选项';
+          list.appendChild(hint);
+        }
+
+        state.shiftOptions.forEach((shift) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.dataset.value = shift;
+          btn.textContent = shift;
+          if (shift === cellData.value) {
+            btn.className = 'bg-sky-500/20 text-sky-100';
+          } else {
+            btn.className = 'text-slate-200';
+          }
+          btn.addEventListener('click', () => {
+            submitShiftValue({
+              cell,
+              day,
+              empId,
+              value: shift,
+              version: cellData.version || 0,
+            });
+          });
+          list.appendChild(btn);
+        });
+
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.dataset.value = '';
+        clearBtn.textContent = '清除班次';
+        clearBtn.addEventListener('click', () => {
+          submitShiftValue({
+            cell,
+            day,
+            empId,
+            value: '',
+            version: cellData.version || 0,
+          });
+        });
+        list.appendChild(clearBtn);
+
+        elements.popover.appendChild(list);
+
+        popoverContext = { cell, day, empId };
+        elements.popover.classList.remove('hidden');
+        positionPopover(cell);
+      }
+
+      function positionPopover(cell) {
+        const rect = cell.getBoundingClientRect();
+        const popRect = elements.popover.getBoundingClientRect();
+        const margin = 8;
+        let top = rect.bottom + margin;
+        let left = rect.left;
+
+        if (top + popRect.height > window.innerHeight) {
+          top = rect.top - popRect.height - margin;
+        }
+        if (left + popRect.width > window.innerWidth) {
+          left = window.innerWidth - popRect.width - margin;
+        }
+        if (left < margin) {
+          left = margin;
+        }
+
+        elements.popover.style.top = `${top}px`;
+        elements.popover.style.left = `${left}px`;
+      }
+
+      function closePopover() {
+        elements.popover.classList.add('hidden');
+        popoverContext = null;
+      }
+
+      async function submitShiftValue({ cell, day, empId, value, version }) {
+        closePopover();
+        const payload = {
+          action: 'upsert_cell',
+          team_id: state.teamId,
+          day,
+          emp_id: empId,
+          value,
+          client_version: version || 0,
+        };
+
+        let response;
+        try {
+          response = await fetch('/api/schedule.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload),
+          });
+        } catch (error) {
+          showToast('网络异常，保存失败');
+          return;
+        }
+
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data) {
+          const message = data && data.error ? data.error : '保存失败';
+          showToast(message);
+          return;
+        }
+
+        if (!data.ok) {
+          if (data.conflict) {
+            showToast('存在新版本，请刷新后重试');
+          } else {
+            showToast(data.error || '保存失败');
+          }
+          return;
+        }
+
+        const key = `${day}|${empId}`;
+        const updatedCell = {
+          value: data.cell ? data.cell.value || '' : value,
+          version: data.cell ? data.cell.version || data.new_version || 0 : data.new_version || 0,
+          updated_at: data.cell ? data.cell.updated_at || null : null,
+          updated_by: data.cell ? data.cell.updated_by || null : null,
+        };
+        state.cells.set(key, updatedCell);
+        updateCellElement(cell, updatedCell);
+        showToast('已更新班次', 'success');
+      }
+
+      function updateCellElement(cell, cellData) {
+        const inner = cell.querySelector('.schedule-cell');
+        cell.dataset.version = String(cellData.version || 0);
+        cell.dataset.value = cellData.value || '';
+        inner.className = 'schedule-cell';
+        if (state.canEdit && cell.dataset.disabled !== '1') {
+          inner.classList.add('interactive');
+        }
+        if (cell.dataset.disabled === '1') {
+          inner.classList.add('disabled');
+        }
+
+        if (cellData.value) {
+          inner.textContent = cellData.value;
+          const shiftClass = getShiftClass(cellData.value);
+          if (shiftClass) {
+            inner.classList.add(shiftClass);
+          }
+        } else {
+          inner.textContent = '—';
+          inner.classList.add('empty');
+        }
+
+        if (cellData.updated_at) {
+          const updater = cellData.updated_by && cellData.updated_by.display_name ? cellData.updated_by.display_name : '未知';
+          cell.title = `版本 ${cellData.version || 0} · ${cellData.updated_at} · ${updater}`;
+        } else {
+          cell.title = '';
+        }
+      }
+
+      function getShiftClass(shift) {
+        switch (shift) {
+          case '白':
+            return SHIFT_STYLE.get('白');
+          case '中1':
+            return SHIFT_STYLE.get('中1');
+          case '中2':
+            return SHIFT_STYLE.get('中2');
+          case '夜':
+            return SHIFT_STYLE.get('夜');
+          case '休息':
+            return SHIFT_STYLE.get('休息');
+          default:
+            return '';
+        }
+      }
+
+      function getShiftColor(shift) {
+        switch (shift) {
+          case '白':
+            return 'linear-gradient(135deg, rgba(56,189,248,0.4), rgba(59,130,246,0.35))';
+          case '中1':
+            return 'linear-gradient(135deg, rgba(129,140,248,0.4), rgba(14,116,144,0.35))';
+          case '中2':
+            return 'linear-gradient(135deg, rgba(244,114,182,0.45), rgba(236,72,153,0.35))';
+          case '夜':
+            return 'linear-gradient(135deg, rgba(14,116,144,0.4), rgba(6,78,59,0.35))';
+          case '休息':
+            return 'linear-gradient(135deg, rgba(34,197,94,0.45), rgba(74,222,128,0.35))';
+          default:
+            return 'rgba(148, 163, 184, 0.3)';
+        }
+      }
+
+      function getEmployeeName(empId) {
+        const emp = state.employees.find((item) => item.id === empId);
+        return emp ? emp.display_name || emp.name || `成员#${emp.id}` : `成员#${empId}`;
+      }
+
+      function addDays(date, days) {
+        const result = new Date(date.getTime());
+        result.setDate(result.getDate() + days);
+        return result;
+      }
+
+      function formatDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+
+      function showToast(message, type = 'error') {
+        elements.toast.innerHTML = '';
+        const wrapper = document.createElement('div');
+        wrapper.className = `pointer-events-auto px-4 py-2 rounded-xl shadow-lg text-sm font-medium ${
+          type === 'success' ? 'bg-emerald-500/90 text-white' : 'bg-rose-500/90 text-white'
+        }`;
+        wrapper.textContent = message;
+        elements.toast.appendChild(wrapper);
+        setTimeout(() => {
+          wrapper.classList.add('opacity-0', 'transition', 'duration-300');
+          setTimeout(() => wrapper.remove(), 300);
+        }, 2500);
+      }
+    </script>
+  </body>
+</html>
