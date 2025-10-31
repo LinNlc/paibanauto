@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>排班助手 - 登录</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/public/app.css" />
-    <script src="/public/app.js"></script>
+    <link rel="stylesheet" href="./app.css" />
+    <script src="./app.js"></script>
   </head>
   <body class="login-page min-h-screen flex items-center justify-center text-slate-100">
     <div class="relative z-10 w-full max-w-md mx-auto px-6">
@@ -73,7 +73,7 @@
           submitBtn.innerHTML = '<span class="animate-pulse">登录中…</span>';
 
           try {
-            const response = await fetch('/api/auth.php?action=login', {
+            const response = await fetch('../api/auth.php?action=login', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -91,7 +91,7 @@
 
             App.toast('登录成功，即将跳转…', { type: 'success', duration: 1600 });
             setTimeout(() => {
-              window.location.href = '/public/index.html';
+              window.location.href = './index.html';
             }, 600);
           } catch (error) {
             App.toast('网络异常，请稍后再试');
