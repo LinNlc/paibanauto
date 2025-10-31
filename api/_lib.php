@@ -114,6 +114,13 @@ function clear_current_user(): void
     }
 }
 
+function release_session_lock(): void
+{
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+}
+
 function require_login(): array
 {
     $user = current_user();

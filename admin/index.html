@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>排班助手 - 管理后台</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/public/app.css" />
-    <script src="/public/app.js"></script>
+    <link rel="stylesheet" href="../public/app.css" />
+    <script src="../public/app.js"></script>
     <style>
       .tab-button.active {
         background: rgba(148, 163, 184, 0.16);
@@ -26,11 +26,11 @@
         <div class="sidebar-inner">
           <div class="sidebar-header">排班助手</div>
           <nav>
-            <a href="/public/index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
-            <a href="/public/people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
-            <a href="/public/schedule.html" data-view="schedule"><span class="nav-indicator"></span>排班表</a>
-            <a href="/public/stats.html" data-view="stats"><span class="nav-indicator"></span>数据统计</a>
-            <a href="/admin/index.html" data-view="admin" class="is-active"><span class="nav-indicator"></span>后台管理</a>
+            <a href="../public/index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
+            <a href="../public/people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
+            <a href="../public/schedule.html" data-view="schedule"><span class="nav-indicator"></span>排班表</a>
+            <a href="../public/stats.html" data-view="stats"><span class="nav-indicator"></span>数据统计</a>
+            <a href="./index.html" data-view="admin" class="is-active"><span class="nav-indicator"></span>后台管理</a>
           </nav>
         </div>
       </aside>
@@ -42,7 +42,7 @@
               <p class="header-subtitle">管理团队、账号与权限配置。</p>
             </div>
             <div class="flex items-center gap-3 text-sm text-slate-300">
-              <a href="/public/index.html" class="btn-secondary">返回首页</a>
+              <a href="../public/index.html" class="btn-secondary">返回首页</a>
               <button id="logout-btn" class="btn-secondary">退出登录</button>
             </div>
           </div>
@@ -261,7 +261,7 @@
 
       function parseJsonResponse(response, fallbackError) {
         if (response.status === 401) {
-          window.location.href = '/public/login.html';
+          window.location.href = '../public/login.html';
           throw new Error('UNAUTHENTICATED');
         }
 
@@ -290,7 +290,7 @@
       }
 
       async function apiGet(url) {
-        const response = await fetch(url, {
+        const response = await fetch(resolveApiUrl(url), {
           method: 'GET',
           credentials: 'include',
         });
@@ -298,7 +298,7 @@
       }
 
       async function apiPost(url, payload) {
-        const response = await fetch(url, {
+        const response = await fetch(resolveApiUrl(url), {
           method: 'POST',
           credentials: 'include',
           headers: {
@@ -764,7 +764,7 @@
         } catch (err) {
           console.warn(err);
         } finally {
-          window.location.href = '/public/login.html';
+          window.location.href = '../public/login.html';
         }
       });
 
@@ -772,6 +772,17 @@
         App.initSidebar({ activeView: 'admin' });
         loadInitialData();
       });
+      function resolveApiUrl(url) {
+        if (!url) {
+          return url;
+        }
+        if (/^https?:/i.test(url) || url.startsWith('../')) {
+          return url;
+        }
+        const normalized = url.startsWith('/') ? url.slice(1) : url;
+        return `../${normalized}`;
+      }
+
     </script>
   </body>
 </html>

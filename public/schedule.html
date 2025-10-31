@@ -8,8 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/public/app.css" />
-    <script src="/public/app.js"></script>
+    <link rel="stylesheet" href="./app.css" />
+    <script src="./app.js"></script>
     <style>
       :root {
         --schedule-date-width: 140px;
@@ -209,11 +209,11 @@
         <div class="sidebar-inner">
           <div class="sidebar-header">排班助手</div>
           <nav>
-            <a href="/public/index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
-            <a href="/public/people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
-            <a href="/public/schedule.html" data-view="schedule" class="is-active"><span class="nav-indicator"></span>排班表</span></a>
-            <a href="/public/stats.html" data-view="stats"><span class="nav-indicator"></span>数据统计</a>
-            <a href="/admin/index.html" data-view="admin"><span class="nav-indicator"></span>后台管理</a>
+            <a href="./index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
+            <a href="./people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
+            <a href="./schedule.html" data-view="schedule" class="is-active"><span class="nav-indicator"></span>排班表</span></a>
+            <a href="./stats.html" data-view="stats"><span class="nav-indicator"></span>数据统计</a>
+            <a href="../admin/index.html" data-view="admin"><span class="nav-indicator"></span>后台管理</a>
           </nav>
         </div>
       </aside>
@@ -387,17 +387,17 @@
 
       async function ensureLoggedIn() {
         try {
-          const response = await fetch('/api/auth.php?action=me', {
+          const response = await fetch('../api/auth.php?action=me', {
             method: 'GET',
             credentials: 'include',
           });
           if (!response.ok) {
-            window.location.href = '/public/login.html';
+            window.location.href = './login.html';
             return false;
           }
           const data = await response.json();
           if (!data || !data.ok || !data.user) {
-            window.location.href = '/public/login.html';
+            window.location.href = './login.html';
             return false;
           }
           state.user = data.user;
@@ -406,13 +406,13 @@
           if (!userCanAccessView(state.user, CURRENT_VIEW)) {
             App.toast('无权访问该视图');
             setTimeout(() => {
-              window.location.href = '/public/index.html';
+              window.location.href = './index.html';
             }, 800);
             return false;
           }
           return true;
         } catch (error) {
-          window.location.href = '/public/login.html';
+          window.location.href = './login.html';
           return false;
         }
       }
@@ -548,7 +548,8 @@
             params.set('end', state.end);
           }
 
-          const url = params.toString() ? `/api/schedule.php?${params}` : '/api/schedule.php';
+          const baseUrl = '../api/schedule.php';
+          const url = params.toString() ? `${baseUrl}?${params}` : baseUrl;
 
           let response;
           try {
@@ -559,7 +560,7 @@
           }
 
           if (response.status === 401) {
-            window.location.href = '/public/login.html';
+            window.location.href = './login.html';
             return;
           }
 
@@ -629,7 +630,7 @@
           start: state.start,
           end: state.end,
         });
-        const source = new EventSource(`/api/sse.php?${params.toString()}`);
+        const source = new EventSource(`../api/sse.php?${params.toString()}`);
         source.addEventListener('op', handleSseOp);
         source.onopen = () => {
           if (sseReconnectTimer) {
@@ -1136,7 +1137,7 @@
 
         let response;
         try {
-          response = await fetch('/api/schedule.php', {
+          response = await fetch('../api/schedule.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',

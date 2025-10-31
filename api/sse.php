@@ -13,6 +13,7 @@ if ($teamId <= 0) {
 }
 
 ensure_team_access($permissions, $teamId);
+release_session_lock();
 
 $startParam = isset($_GET['start']) ? (string) $_GET['start'] : '';
 $endParam = isset($_GET['end']) ? (string) $_GET['end'] : '';

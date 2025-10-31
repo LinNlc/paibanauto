@@ -9,8 +9,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/public/app.css" />
-    <script src="/public/app.js"></script>
+    <link rel="stylesheet" href="./app.css" />
+    <script src="./app.js"></script>
   </head>
   <body>
     <button type="button" class="app-sidebar-toggle" data-sidebar-toggle aria-label="展开菜单">
@@ -23,11 +23,11 @@
         <div class="sidebar-inner">
           <div class="sidebar-header">排班助手</div>
           <nav>
-            <a href="/public/index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
-            <a href="/public/people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
-            <a href="/public/schedule.html" data-view="schedule"><span class="nav-indicator"></span>排班表</a>
-            <a href="/public/stats.html" data-view="stats" class="is-active"><span class="nav-indicator"></span>数据统计</a>
-            <a href="/admin/index.html" data-view="admin"><span class="nav-indicator"></span>后台管理</a>
+            <a href="./index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
+            <a href="./people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
+            <a href="./schedule.html" data-view="schedule"><span class="nav-indicator"></span>排班表</a>
+            <a href="./stats.html" data-view="stats" class="is-active"><span class="nav-indicator"></span>数据统计</a>
+            <a href="../admin/index.html" data-view="admin"><span class="nav-indicator"></span>后台管理</a>
           </nav>
         </div>
       </aside>
@@ -254,17 +254,17 @@
 
       async function ensureLoggedIn() {
         try {
-          const response = await fetch('/api/auth.php?action=me', {
+          const response = await fetch('../api/auth.php?action=me', {
             method: 'GET',
             credentials: 'include',
           });
           if (!response.ok) {
-            window.location.href = '/public/login.html';
+            window.location.href = './login.html';
             return false;
           }
           const data = await response.json().catch(() => null);
           if (!data || !data.ok || !data.user) {
-            window.location.href = '/public/login.html';
+            window.location.href = './login.html';
             return false;
           }
           state.user = data.user;
@@ -273,13 +273,13 @@
           if (!userCanAccessView(state.user, CURRENT_VIEW)) {
             App.toast('无权访问该视图');
             setTimeout(() => {
-              window.location.href = '/public/index.html';
+              window.location.href = './index.html';
             }, 800);
             return false;
           }
           return true;
         } catch (error) {
-          window.location.href = '/public/login.html';
+          window.location.href = './login.html';
           return false;
         }
       }
@@ -311,12 +311,12 @@
         App.showLoading('正在加载统计数据…');
         try {
           const params = buildParams('by_person');
-          const response = await fetch(`/api/stats.php?${params.toString()}`, {
+          const response = await fetch(`../api/stats.php?${params.toString()}`, {
             method: 'GET',
             credentials: 'include',
           });
           if (response.status === 401) {
-            window.location.href = '/public/login.html';
+            window.location.href = './login.html';
             return;
           }
           if (response.status === 403) {
@@ -371,12 +371,12 @@
         App.showLoading('正在加载在岗数据…');
         try {
           const params = buildParams('coverage_by_day');
-          const response = await fetch(`/api/stats.php?${params.toString()}`, {
+          const response = await fetch(`../api/stats.php?${params.toString()}`, {
             method: 'GET',
             credentials: 'include',
           });
           if (response.status === 401) {
-            window.location.href = '/public/login.html';
+            window.location.href = './login.html';
             return;
           }
           if (response.status === 403) {
