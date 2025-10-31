@@ -28,6 +28,7 @@
         border-collapse: separate;
         border-spacing: 0;
         min-width: 100%;
+        table-layout: fixed;
       }
 
       .schedule-table th,
@@ -864,6 +865,49 @@
           });
           return;
         }
+        const controls = [
+          elements.applyRange,
+          elements.rangeToday,
+          elements.rangePrev,
+          elements.rangeNext,
+          elements.windowBack,
+          elements.windowForward,
+          elements.startInput,
+          elements.endInput,
+          elements.windowSize,
+        ];
+
+        if (!state.teams.length) {
+          state.teamId = null;
+          elements.teamName.textContent = '暂无可访问团队';
+          controls.forEach((ctrl) => {
+            if (ctrl) ctrl.disabled = true;
+          });
+          return;
+        }
+        const controls = [
+          elements.applyRange,
+          elements.rangeToday,
+          elements.rangePrev,
+          elements.rangeNext,
+          elements.windowBack,
+          elements.windowForward,
+          elements.startInput,
+          elements.endInput,
+          elements.windowSize,
+        ];
+
+        if (!state.teams.length) {
+          state.teamId = null;
+          elements.teamName.textContent = '暂无可访问团队';
+          controls.forEach((ctrl) => {
+            if (ctrl) ctrl.disabled = true;
+          });
+          return;
+        }
+
+        const desiredId = Number(state.teamId);
+        let activeTeam = state.teams.find((team) => Number(team.id) === desiredId);
 
         const desiredId = Number(state.teamId);
         let activeTeam = state.teams.find((team) => Number(team.id) === desiredId);
@@ -979,18 +1023,17 @@
         const endIndex = Math.min(state.windowStart + state.windowSize, state.days.length);
         const visibleDays = state.days.slice(state.windowStart, endIndex);
 
+        adjustWindowBounds();
+        const endIndex = Math.min(state.windowStart + state.windowSize, state.days.length);
+        const visibleDays = state.days.slice(state.windowStart, endIndex);
+
         const headRow = document.createElement('tr');
-        const dateTh = document.createElement('th');
-        dateTh.className = 'sticky-col-1 text-left text-xs tracking-[0.3em] text-slate-400';
-        dateTh.textContent = '日期';
-        headRow.appendChild(dateTh);
+        const nameTh = document.createElement('th');
+        nameTh.className = 'sticky-col-1 text-left text-xs tracking-[0.3em] text-slate-400';
+        nameTh.textContent = '姓名';
+        headRow.appendChild(nameTh);
 
-        const weekTh = document.createElement('th');
-        weekTh.className = 'sticky-col-2 text-left text-xs tracking-[0.3em] text-slate-400';
-        weekTh.textContent = '星期';
-        headRow.appendChild(weekTh);
-
-        state.employees.forEach((emp) => {
+        visibleDays.forEach((day) => {
           const th = document.createElement('th');
           th.dataset.empId = String(emp.id);
           th.className = 'schedule-emp-head';
@@ -1017,7 +1060,7 @@
         elements.scheduleHead.appendChild(headRow);
 
         const fragment = document.createDocumentFragment();
-        visibleDays.forEach((day) => {
+        state.employees.forEach((emp) => {
           const tr = document.createElement('tr');
 
           const dateTd = document.createElement('td');
@@ -1041,7 +1084,7 @@
           weekTd.textContent = `周${day.weekday}`;
           tr.appendChild(weekTd);
 
-          state.employees.forEach((emp) => {
+          visibleDays.forEach((day) => {
             const td = document.createElement('td');
             td.dataset.empId = String(emp.id);
             td.dataset.day = day.date;
