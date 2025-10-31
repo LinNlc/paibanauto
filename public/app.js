@@ -20,6 +20,43 @@
     },
   };
 
+  const TEAM_STORAGE_KEY = 'paiban:selected-team-id';
+
+  function normalizeTeamId(value) {
+    const num = Number.parseInt(value, 10);
+    return Number.isFinite(num) && num > 0 ? num : null;
+  }
+
+  App.getPreferredTeamId = function getPreferredTeamId() {
+    try {
+      const raw = window.localStorage.getItem(TEAM_STORAGE_KEY);
+      return normalizeTeamId(raw);
+    } catch (error) {
+      return null;
+    }
+  };
+
+  App.setPreferredTeamId = function setPreferredTeamId(teamId) {
+    const normalized = normalizeTeamId(teamId);
+    try {
+      if (normalized === null) {
+        window.localStorage.removeItem(TEAM_STORAGE_KEY);
+      } else {
+        window.localStorage.setItem(TEAM_STORAGE_KEY, String(normalized));
+      }
+    } catch (error) {
+      /* 忽略本地存储异常 */
+    }
+    App.emit('team:change', { teamId: normalized });
+  };
+
+  window.addEventListener('storage', (event) => {
+    if (event.key !== TEAM_STORAGE_KEY) {
+      return;
+    }
+    App.emit('team:change', { teamId: App.getPreferredTeamId() });
+  });
+
   let toastContainer;
   let toastHideTimer;
 
