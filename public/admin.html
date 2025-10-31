@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>排班助手 - 权限设置</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./app.css?v=20240605" />
+    <script src="./app.js?v=20240605"></script>
+  </head>
+  <body>
+    <button type="button" class="app-sidebar-toggle" data-sidebar-toggle aria-label="展开菜单">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <div class="sidebar-inner">
+          <div class="sidebar-header">排班助手</div>
+          <nav>
+            <a href="./index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
+            <a href="./people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
+            <a href="./schedule.html" data-view="schedule"><span class="nav-indicator"></span>排班表</a>
+            <a href="./stats.html" data-view="stats"><span class="nav-indicator"></span>数据统计</a>
+            <a href="./admin.html" data-view="admin" class="is-active"><span class="nav-indicator"></span>权限设置</a>
+          </nav>
+          <section class="sidebar-meta">
+            <div class="sidebar-version">
+              <span class="sidebar-version-label">当前版本</span>
+              <div class="sidebar-version-value">
+                <span class="sidebar-version-number" data-app-version>—</span>
+                <span class="sidebar-version-date">更新时间：<span data-app-release>—</span></span>
+              </div>
+            </div>
+            <div class="sidebar-changelog">
+              <div class="sidebar-changelog-title">更新日志</div>
+              <ul class="sidebar-changelog-list" data-app-changelog></ul>
+            </div>
+          </section>
+        </div>
+      </aside>
+      <main class="app-main space-y-8 pb-12">
+        <header class="app-header">
+          <div class="header-topline">
+            <div>
+              <div class="inline-flex items-center gap-2 text-sm text-slate-400">
+                <span class="px-3 py-1 rounded-full border border-slate-700/60 bg-slate-900/70">系统管理</span>
+                <span class="hidden sm:inline">仅限高级管理员</span>
+              </div>
+              <h1 class="header-title mt-2">权限设置</h1>
+              <p class="header-subtitle">集中管理账号角色、可访问视图以及可操作的团队。</p>
+            </div>
+            <div class="flex items-center gap-3 text-sm text-slate-300">
+              <a href="./index.html" class="btn-secondary">返回首页</a>
+              <button type="button" class="btn-secondary" data-action="logout">退出登录</button>
+            </div>
+          </div>
+        </header>
+
+        <section class="card-surface space-y-8">
+          <div id="access-denied" class="hidden text-center py-16">
+            <h2 class="text-2xl font-semibold mb-2">暂无访问权限</h2>
+            <p class="text-slate-400">该页面仅对高级管理员开放，如需访问请联系系统管理员。</p>
+            <a href="./index.html" class="btn-secondary mt-6 inline-flex items-center gap-2">
+              <span>返回首页</span>
+            </a>
+          </div>
+
+          <div id="permissions-shell" class="hidden space-y-8">
+            <div class="grid gap-4 sm:grid-cols-3">
+              <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                <div class="text-xs uppercase tracking-[0.3em] text-slate-500">账号总数</div>
+                <div id="metric-users-total" class="mt-3 text-3xl font-semibold text-slate-100">0</div>
+              </div>
+              <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                <div class="text-xs uppercase tracking-[0.3em] text-slate-500">启用账号</div>
+                <div id="metric-users-active" class="mt-3 text-3xl font-semibold text-emerald-200">0</div>
+              </div>
+              <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                <div class="text-xs uppercase tracking-[0.3em] text-slate-500">已禁用</div>
+                <div id="metric-users-disabled" class="mt-3 text-3xl font-semibold text-rose-200">0</div>
+              </div>
+            </div>
+
+            <section class="bg-slate-950/60 border border-slate-800 rounded-2xl p-6 space-y-5">
+              <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="space-y-1">
+                  <h2 class="text-lg font-semibold text-slate-100">团队管理</h2>
+                  <p class="text-sm text-slate-400">新增、重命名或删除可切换的团队。</p>
+                </div>
+                <form id="team-form" class="flex flex-wrap items-center gap-3">
+                  <input
+                    id="team-name-input"
+                    type="text"
+                    class="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-600"
+                    placeholder="例如：白班A组"
+                    aria-label="团队名称"
+                  />
+                  <button type="submit" class="btn-primary">新增团队</button>
+                </form>
+              </div>
+              <p id="teams-empty" class="team-list-empty hidden">暂无团队，请先新增团队以供切换。</p>
+              <ul id="teams-list" class="team-list"></ul>
+            </section>
+
+            <div class="grid gap-8 lg:grid-cols-[minmax(0,380px)_1fr]">
+              <form id="user-form" class="bg-slate-950/60 border border-slate-800 rounded-2xl p-6 space-y-5">
+                <div>
+                  <h2 class="text-lg font-semibold text-slate-100">编辑账号权限</h2>
+                  <p class="text-sm text-slate-400">选择需要调整的账号，配置其角色、可见范围与编辑权限。</p>
+                </div>
+                <input type="hidden" id="user-id" />
+                <div class="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label for="user-username" class="block text-sm font-medium mb-1">用户名</label>
+                    <input id="user-username" type="text" class="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-600" placeholder="例如：admin" />
+                  </div>
+                  <div>
+                    <label for="user-display-name" class="block text-sm font-medium mb-1">显示名称</label>
+                    <input id="user-display-name" type="text" class="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-600" placeholder="例如：管理员" />
+                  </div>
+                  <div>
+                    <label for="user-role" class="block text-sm font-medium mb-1">角色</label>
+                    <select id="user-role" class="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-600">
+                      <option value="admin">管理员</option>
+                      <option value="editor">编辑</option>
+                      <option value="readonly">只读</option>
+                    </select>
+                  </div>
+                  <div id="user-password-group">
+                    <label for="user-password" class="block text-sm font-medium mb-1">初始密码</label>
+                    <input id="user-password" type="password" class="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-600" placeholder="设置初始密码" />
+                    <p class="text-xs text-slate-500 mt-1">仅在新增账号时需要设置。</p>
+                  </div>
+                </div>
+                <div class="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label for="allowed-teams" class="block text-sm font-medium mb-1">可见团队</label>
+                    <select id="allowed-teams" class="w-full h-32 rounded border border-slate-700 bg-slate-900 px-3 py-2" multiple></select>
+                  </div>
+                  <div>
+                    <label for="editable-teams" class="block text-sm font-medium mb-1">可编辑团队</label>
+                    <select id="editable-teams" class="w-full h-32 rounded border border-slate-700 bg-slate-900 px-3 py-2" multiple></select>
+                  </div>
+                </div>
+                <div>
+                  <span class="block text-sm font-medium mb-2">可访问视图</span>
+                  <div id="allowed-views" class="flex flex-wrap gap-3"></div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input id="user-disabled" type="checkbox" class="w-4 h-4 rounded border-slate-700 bg-slate-900" />
+                  <label for="user-disabled" class="text-sm">禁用该账号</label>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                  <button type="submit" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold">保存设置</button>
+                  <button type="button" id="user-form-reset" class="px-4 py-2 rounded border border-slate-700 hover:bg-slate-800 text-sm">重置</button>
+                  <button type="button" id="user-reset-password" class="hidden px-4 py-2 rounded border border-amber-500 text-amber-200 hover:bg-amber-500/10 text-sm">重置密码</button>
+                  <button type="button" id="user-delete" class="hidden px-4 py-2 rounded border border-rose-500 text-rose-200 hover:bg-rose-500/10 text-sm">删除账号</button>
+                  <span id="user-form-status" class="text-xs text-slate-400"></span>
+                </div>
+                <button type="button" id="user-new-btn" class="btn-secondary w-full">新增账号</button>
+              </form>
+
+              <div class="space-y-5">
+                <div>
+                  <h2 class="text-lg font-semibold text-slate-100">账号列表</h2>
+                  <p class="text-sm text-slate-400">点击任意账号即可在左侧调整其权限设置。</p>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="min-w-full text-left text-sm border border-slate-800 rounded-2xl overflow-hidden">
+                    <thead class="bg-slate-900/70 text-slate-300 text-xs uppercase tracking-[0.2em]">
+                      <tr>
+                        <th class="px-4 py-2">用户名</th>
+                        <th class="px-4 py-2">显示名</th>
+                        <th class="px-4 py-2">角色</th>
+                        <th class="px-4 py-2">可见团队</th>
+                        <th class="px-4 py-2">可编辑团队</th>
+                        <th class="px-4 py-2">视图</th>
+                        <th class="px-4 py-2">状态</th>
+                        <th class="px-4 py-2 text-right">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="users-list" class="divide-y divide-slate-800"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const viewOptions = [
+        { value: 'people', label: '人员管理' },
+        { value: 'schedule', label: '排班表' },
+        { value: 'stats', label: '数据统计' },
+        { value: 'admin', label: '权限设置' },
+      ];
+
+      const state = {
+        me: null,
+        teams: [],
+        users: [],
+        editingUserId: null,
+      };
+
+      const elements = {
+        shell: document.getElementById('permissions-shell'),
+        denied: document.getElementById('access-denied'),
+        usersList: document.getElementById('users-list'),
+        userForm: document.getElementById('user-form'),
+        userId: document.getElementById('user-id'),
+        userUsername: document.getElementById('user-username'),
+        userDisplayName: document.getElementById('user-display-name'),
+        userRole: document.getElementById('user-role'),
+        userPassword: document.getElementById('user-password'),
+        userPasswordGroup: document.getElementById('user-password-group'),
+        allowedTeams: document.getElementById('allowed-teams'),
+        editableTeams: document.getElementById('editable-teams'),
+        allowedViews: document.getElementById('allowed-views'),
+        userDisabled: document.getElementById('user-disabled'),
+        userFormStatus: document.getElementById('user-form-status'),
+        userFormReset: document.getElementById('user-form-reset'),
+        userResetPassword: document.getElementById('user-reset-password'),
+        userDelete: document.getElementById('user-delete'),
+        userNew: document.getElementById('user-new-btn'),
+        teamForm: document.getElementById('team-form'),
+        teamName: document.getElementById('team-name-input'),
+        teamList: document.getElementById('teams-list'),
+        teamEmpty: document.getElementById('teams-empty'),
+        metricTotal: document.getElementById('metric-users-total'),
+        metricActive: document.getElementById('metric-users-active'),
+        metricDisabled: document.getElementById('metric-users-disabled'),
+      };
+
+      function normalizeViewList(list) {
+        if (!Array.isArray(list)) {
+          return [];
+        }
+        return list.map((item) => String(item).toLowerCase());
+      }
+
+      function userCanAccessView(user, view) {
+        if (!view) return true;
+        if (!user) return false;
+        const normalizedView = String(view).toLowerCase();
+        if (normalizedView === 'home') {
+          return true;
+        }
+        if (normalizedView === 'admin' && String(user.role || '').toLowerCase() !== 'admin') {
+          return false;
+        }
+        const allowedViews = normalizeViewList(user.allowed_views);
+        if (allowedViews.includes('*')) {
+          return true;
+        }
+        return allowedViews.includes(normalizedView);
+      }
+
+      function applyViewVisibility(user) {
+        document.querySelectorAll('[data-view]').forEach((link) => {
+          const view = String(link.dataset.view || '').toLowerCase();
+          if (!view || view === 'home') {
+            link.classList.remove('hidden');
+            return;
+          }
+          if (userCanAccessView(user, view)) {
+            link.classList.remove('hidden');
+          } else {
+            link.classList.add('hidden');
+          }
+        });
+      }
+
+      async function parseJsonResponse(response, fallbackError) {
+        if (response.status === 401) {
+          window.location.href = './login.html';
+          throw new Error('UNAUTHENTICATED');
+        }
+        const text = await response.text();
+        let data = null;
+        if (text) {
+          try {
+            data = JSON.parse(text);
+          } catch (error) {
+            throw new Error('服务器返回无效数据');
+          }
+        }
+        if (response.status === 403) {
+          throw new Error('FORBIDDEN');
+        }
+        if (!response.ok || !data || data.ok !== true) {
+          const message = data && (data.error || data.msg);
+          throw new Error(message || fallbackError);
+        }
+        return data;
+      }
+
+      async function apiGet(url) {
+        const response = await fetch(url, { method: 'GET', credentials: 'include' });
+        return parseJsonResponse(response, '请求失败');
+      }
+
+      async function apiPost(url, payload) {
+        const response = await fetch(url, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+        return parseJsonResponse(response, '操作失败');
+      }
+
+      function getSelectedTeamIds(select) {
+        return Array.from(select.selectedOptions)
+          .map((option) => Number.parseInt(option.value, 10))
+          .filter((id) => Number.isInteger(id) && id > 0);
+      }
+
+      function populateTeamSelect(select, selectedIds = []) {
+        const selection = new Set(selectedIds);
+        select.innerHTML = '';
+        state.teams.forEach((team) => {
+          const option = document.createElement('option');
+          option.value = String(team.id);
+          option.textContent = `${team.name} (#${team.id})`;
+          if (selection.has(team.id)) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+      }
+
+      function refreshTeamSelectOptions() {
+        const allowedSelected = getSelectedTeamIds(elements.allowedTeams);
+        const editableSelected = getSelectedTeamIds(elements.editableTeams);
+        populateTeamSelect(elements.allowedTeams, allowedSelected);
+        populateTeamSelect(elements.editableTeams, editableSelected);
+      }
+
+      function renderTeamsList() {
+        if (!elements.teamList) {
+          return;
+        }
+        if (!Array.isArray(state.teams) || state.teams.length === 0) {
+          elements.teamList.innerHTML = '';
+          if (elements.teamEmpty) {
+            elements.teamEmpty.classList.remove('hidden');
+          }
+          return;
+        }
+
+        if (elements.teamEmpty) {
+          elements.teamEmpty.classList.add('hidden');
+        }
+
+        const items = state.teams
+          .slice()
+          .sort((a, b) => a.id - b.id)
+          .map(
+            (team) => `
+              <li class="team-list-item" data-team-id="${team.id}">
+                <div class="team-list-info">
+                  <span class="font-semibold">${team.name}</span>
+                  <small>ID：${team.id}</small>
+                </div>
+                <div class="team-list-actions">
+                  <button type="button" class="team-action-btn" data-action="rename-team">重命名</button>
+                  <button type="button" class="team-action-btn danger" data-action="delete-team">删除</button>
+                </div>
+              </li>
+            `
+          )
+          .join('');
+
+        elements.teamList.innerHTML = items;
+      }
+
+      function syncTeamRecord(team) {
+        if (!team || typeof team.id !== 'number') {
+          return;
+        }
+        const idx = state.teams.findIndex((item) => item.id === team.id);
+        if (idx >= 0) {
+          state.teams.splice(idx, 1, team);
+        } else {
+          state.teams.push(team);
+        }
+        state.teams.sort((a, b) => a.id - b.id);
+        renderTeamsList();
+        refreshTeamSelectOptions();
+        renderUsersList();
+      }
+
+      function removeTeamRecordById(id) {
+        state.teams = state.teams.filter((team) => team.id !== id);
+        renderTeamsList();
+        refreshTeamSelectOptions();
+        renderUsersList();
+      }
+
+      function renderAllowedViewCheckboxes(selectedViews = []) {
+        const selected = new Set(selectedViews.map((view) => String(view).toLowerCase()));
+        elements.allowedViews.innerHTML = viewOptions
+          .map((item) => {
+            const checked = selected.has(item.value) ? 'checked' : '';
+            return `
+              <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" value="${item.value}" class="w-4 h-4 rounded border-slate-700 bg-slate-900" ${checked} />
+                <span>${item.label}</span>
+              </label>
+            `;
+          })
+          .join('');
+      }
+
+      function collectSelectedViews() {
+        return Array.from(elements.allowedViews.querySelectorAll('input[type="checkbox"]'))
+          .filter((input) => input.checked)
+          .map((input) => input.value);
+      }
+
+      function resetUserForm() {
+        state.editingUserId = null;
+        elements.userId.value = '';
+        elements.userUsername.value = '';
+        elements.userUsername.disabled = false;
+        elements.userDisplayName.value = '';
+        elements.userRole.value = 'editor';
+        elements.userPassword.value = '';
+        elements.userPasswordGroup.classList.remove('hidden');
+        populateTeamSelect(elements.allowedTeams, []);
+        populateTeamSelect(elements.editableTeams, []);
+        renderAllowedViewCheckboxes([]);
+        elements.userDisabled.checked = false;
+        elements.userFormStatus.textContent = '新建模式';
+        elements.userResetPassword.classList.add('hidden');
+        elements.userDelete.classList.add('hidden');
+      }
+
+      function setUserFormForEdit(user) {
+        state.editingUserId = user.id;
+        elements.userId.value = String(user.id);
+        elements.userUsername.value = user.username;
+        elements.userUsername.disabled = true;
+        elements.userDisplayName.value = user.display_name || '';
+        elements.userRole.value = user.role || 'editor';
+        elements.userPassword.value = '';
+        elements.userPasswordGroup.classList.add('hidden');
+        populateTeamSelect(elements.allowedTeams, user.allowed_teams || []);
+        populateTeamSelect(elements.editableTeams, user.editable_teams || []);
+        renderAllowedViewCheckboxes(user.allowed_views || []);
+        elements.userDisabled.checked = Boolean(user.disabled);
+        elements.userFormStatus.textContent = `编辑模式 · #${user.id}`;
+        elements.userResetPassword.classList.remove('hidden');
+        elements.userDelete.classList.remove('hidden');
+      }
+
+      function updateMetrics() {
+        const total = state.users.length;
+        const disabled = state.users.filter((user) => user.disabled).length;
+        const active = total - disabled;
+        elements.metricTotal.textContent = total;
+        elements.metricDisabled.textContent = disabled;
+        elements.metricActive.textContent = active;
+      }
+
+      function renderUsersList() {
+        if (state.users.length === 0) {
+          elements.usersList.innerHTML = '<tr><td colspan="8" class="px-4 py-4 text-sm text-slate-400 text-center">暂无账号。</td></tr>';
+          updateMetrics();
+          return;
+        }
+        const teamMap = new Map(state.teams.map((team) => [team.id, team.name]));
+        elements.usersList.innerHTML = state.users
+          .map((user) => {
+            const allowedTeams = (user.allowed_teams || [])
+              .map((id) => teamMap.get(id) || `#${id}`)
+              .join('、') || '全部';
+            const editableTeams = (user.editable_teams || [])
+              .map((id) => teamMap.get(id) || `#${id}`)
+              .join('、') || '无';
+            const views = (user.allowed_views || [])
+              .map((view) => {
+                const option = viewOptions.find((item) => item.value === view);
+                return option ? option.label : view;
+              })
+              .join('、') || '未配置';
+            const status = user.disabled
+              ? '<span class="text-rose-300">已禁用</span>'
+              : '<span class="text-emerald-300">正常</span>';
+            return `
+              <tr class="hover:bg-slate-900/60">
+                <td class="px-4 py-2 font-mono text-xs md:text-sm">${user.username}</td>
+                <td class="px-4 py-2">${user.display_name || ''}</td>
+                <td class="px-4 py-2 uppercase text-xs tracking-wide">${user.role || ''}</td>
+                <td class="px-4 py-2 text-xs md:text-sm">${allowedTeams}</td>
+                <td class="px-4 py-2 text-xs md:text-sm">${editableTeams}</td>
+                <td class="px-4 py-2 text-xs md:text-sm">${views}</td>
+                <td class="px-4 py-2 text-xs md:text-sm">${status}</td>
+                <td class="px-4 py-2 text-right">
+                  <button class="px-3 py-1 rounded border border-sky-500 text-sky-200 hover:bg-sky-500/10 text-xs" data-action="edit-user" data-id="${user.id}">编辑</button>
+                </td>
+              </tr>
+            `;
+          })
+          .join('');
+        updateMetrics();
+      }
+
+      function syncUserRecord(user) {
+        const idx = state.users.findIndex((item) => item.id === user.id);
+        if (idx >= 0) {
+          state.users.splice(idx, 1, user);
+        } else {
+          state.users.push(user);
+        }
+        state.users.sort((a, b) => a.id - b.id);
+        renderUsersList();
+      }
+
+      function removeUserRecord(id) {
+        state.users = state.users.filter((user) => user.id !== id);
+        renderUsersList();
+      }
+
+      async function loadInitialData() {
+        App.showLoading('正在加载权限数据…');
+        try {
+          const meResp = await apiGet('/api/auth.php?action=me');
+          if (!meResp.user || String(meResp.user.role || '').toLowerCase() !== 'admin') {
+            throw new Error('FORBIDDEN');
+          }
+          const allowedViews = normalizeViewList(meResp.user.allowed_views);
+          if (!allowedViews.includes('*') && !allowedViews.includes('admin')) {
+            throw new Error('FORBIDDEN');
+          }
+          state.me = meResp.user;
+          applyViewVisibility(state.me);
+          elements.shell.classList.remove('hidden');
+          elements.denied.classList.add('hidden');
+
+          const [teamsResp, usersResp] = await Promise.all([
+            apiGet('/api/admin/teams.php'),
+            apiGet('/api/admin/users.php'),
+          ]);
+
+          state.teams = Array.isArray(teamsResp.teams) ? teamsResp.teams : [];
+          state.users = Array.isArray(usersResp.users) ? usersResp.users : [];
+          state.teams.sort((a, b) => a.id - b.id);
+          state.users.sort((a, b) => a.id - b.id);
+
+          renderTeamsList();
+          refreshTeamSelectOptions();
+          renderAllowedViewCheckboxes([]);
+          renderUsersList();
+          resetUserForm();
+        } catch (error) {
+          if (error && error.message === 'UNAUTHENTICATED') {
+            return;
+          }
+          elements.shell.classList.add('hidden');
+          elements.denied.classList.remove('hidden');
+          console.error(error);
+        } finally {
+          App.hideLoading();
+        }
+      }
+
+      if (elements.teamForm) {
+        elements.teamForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const name = elements.teamName ? elements.teamName.value.trim() : '';
+          if (!name) {
+            App.toast('请填写团队名称', { type: 'error' });
+            return;
+          }
+          try {
+            const result = await apiPost('/api/admin/teams.php', { action: 'create', name });
+            if (result.team) {
+              syncTeamRecord(result.team);
+              if (elements.teamName) {
+                elements.teamName.value = '';
+              }
+              App.toast('团队已创建', { type: 'success' });
+            }
+          } catch (err) {
+            App.toast(err.message || '创建团队失败', { type: 'error' });
+          }
+        });
+      }
+
+      if (elements.teamList) {
+        elements.teamList.addEventListener('click', async (event) => {
+          const target = event.target instanceof HTMLElement ? event.target : null;
+          if (!target) {
+            return;
+          }
+          const actionButton = target.closest('[data-action]');
+          if (!actionButton) {
+            return;
+          }
+          const action = actionButton.dataset.action;
+          const item = actionButton.closest('[data-team-id]');
+          if (!item) {
+            return;
+          }
+          const teamId = Number.parseInt(item.getAttribute('data-team-id') || '0', 10);
+          if (!Number.isInteger(teamId) || teamId <= 0) {
+            return;
+          }
+          const team = state.teams.find((entry) => entry.id === teamId);
+          if (!team) {
+            App.toast('未找到团队信息', { type: 'error' });
+            return;
+          }
+
+          if (action === 'rename-team') {
+            const nextName = window.prompt('请输入新的团队名称：', team.name);
+            if (nextName === null) {
+              return;
+            }
+            const trimmed = nextName.trim();
+            if (!trimmed) {
+              App.toast('团队名称不能为空', { type: 'error' });
+              return;
+            }
+            if (trimmed === team.name) {
+              return;
+            }
+            try {
+              const result = await apiPost('/api/admin/teams.php', { action: 'update', id: teamId, name: trimmed });
+              if (result.team) {
+                syncTeamRecord(result.team);
+                App.toast('团队名称已更新', { type: 'success' });
+              }
+            } catch (err) {
+              App.toast(err.message || '更新团队失败', { type: 'error' });
+            }
+            return;
+          }
+
+          if (action === 'delete-team') {
+            if (!window.confirm(`确定删除团队“${team.name}”吗？该操作无法撤销。`)) {
+              return;
+            }
+            try {
+              await apiPost('/api/admin/teams.php', { action: 'delete', id: teamId });
+              removeTeamRecordById(teamId);
+              App.toast('团队已删除', { type: 'success' });
+            } catch (err) {
+              App.toast(err.message || '删除团队失败', { type: 'error' });
+            }
+          }
+        });
+      }
+
+      elements.userForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const username = elements.userUsername.value.trim();
+        const displayName = elements.userDisplayName.value.trim();
+        const role = elements.userRole.value;
+        if (!username) {
+          App.toast('请填写用户名', { type: 'error' });
+          return;
+        }
+        if (!displayName) {
+          App.toast('请填写显示名称', { type: 'error' });
+          return;
+        }
+        const allowedTeams = getSelectedTeamIds(elements.allowedTeams);
+        const editableTeams = getSelectedTeamIds(elements.editableTeams);
+        const allowedViews = collectSelectedViews();
+        const disabled = elements.userDisabled.checked;
+
+        const payload = {
+          action: state.editingUserId ? 'update' : 'create',
+          username,
+          display_name: displayName,
+          role,
+          allowed_teams: allowedTeams,
+          editable_teams: editableTeams,
+          allowed_views: allowedViews,
+          disabled,
+        };
+
+        if (state.editingUserId) {
+          payload.id = state.editingUserId;
+        } else {
+          const password = elements.userPassword.value.trim();
+          if (!password) {
+            App.toast('请设置初始密码', { type: 'error' });
+            return;
+          }
+          payload.password = password;
+        }
+
+        try {
+          const result = await apiPost('/api/admin/users.php', payload);
+          if (result.user) {
+            syncUserRecord(result.user);
+            resetUserForm();
+            App.toast('账号保存成功', { type: 'success' });
+          }
+        } catch (err) {
+          App.toast(err.message || '保存失败', { type: 'error' });
+        }
+      });
+
+      elements.userFormReset.addEventListener('click', (event) => {
+        event.preventDefault();
+        resetUserForm();
+      });
+
+      elements.userNew.addEventListener('click', () => {
+        resetUserForm();
+        elements.userUsername.focus();
+      });
+
+      elements.usersList.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+        if (target.dataset.action === 'edit-user') {
+          const id = Number.parseInt(target.dataset.id || '0', 10);
+          if (!id) {
+            return;
+          }
+          const user = state.users.find((item) => item.id === id);
+          if (!user) {
+            App.toast('未找到账号信息', { type: 'error' });
+            return;
+          }
+          setUserFormForEdit(user);
+          App.toast(`正在编辑 ${user.username}`);
+        }
+      });
+
+      elements.userResetPassword.addEventListener('click', async () => {
+        if (!state.editingUserId) {
+          return;
+        }
+        const newPassword = window.prompt('请输入新的登录密码：');
+        if (!newPassword) {
+          return;
+        }
+        try {
+          await apiPost('/api/admin/users.php', {
+            action: 'reset_password',
+            id: state.editingUserId,
+            password: newPassword,
+          });
+          App.toast('密码已更新', { type: 'success' });
+        } catch (err) {
+          App.toast(err.message || '密码重置失败', { type: 'error' });
+        }
+      });
+
+      elements.userDelete.addEventListener('click', async () => {
+        if (!state.editingUserId) {
+          return;
+        }
+        if (!window.confirm('确定删除该账号？该操作不可恢复。')) {
+          return;
+        }
+        try {
+          await apiPost('/api/admin/users.php', { action: 'delete', id: state.editingUserId });
+          removeUserRecord(state.editingUserId);
+          resetUserForm();
+          App.toast('账号已删除', { type: 'success' });
+        } catch (err) {
+          App.toast(err.message || '删除失败', { type: 'error' });
+        }
+      });
+
+      App.ready(() => {
+        App.initSidebar({ activeView: 'admin' });
+        loadInitialData();
+      });
+    </script>
+  </body>
+</html>
