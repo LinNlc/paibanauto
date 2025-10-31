@@ -427,6 +427,7 @@
       let sseSource = null;
       let sseReconnectTimer = null;
       let currentSseKey = '';
+      let scheduledColumnLock = 0;
 
       const elements = {
         teamName: document.getElementById('team-name'),
@@ -593,6 +594,7 @@
           if (!elements.popover.classList.contains('hidden') && popoverContext) {
             positionPopover(popoverContext.cell);
           }
+          lockScheduleColumnWidths();
         });
 
         document.addEventListener('keydown', (event) => {
@@ -1123,6 +1125,59 @@
         });
 
         elements.scheduleBody.appendChild(fragment);
+        lockScheduleColumnWidths();
+      }
+
+      function lockScheduleColumnWidths() {
+        if (scheduledColumnLock) {
+          cancelAnimationFrame(scheduledColumnLock);
+        }
+        scheduledColumnLock = requestAnimationFrame(() => {
+          scheduledColumnLock = 0;
+
+          const colgroup = elements.scheduleColgroup;
+          if (!colgroup) {
+            return;
+          }
+
+          const columns = Array.from(colgroup.children);
+          if (!columns.length) {
+            return;
+          }
+
+          const referenceRow =
+            elements.scheduleBody.querySelector('tr') || elements.scheduleHead.querySelector('tr');
+          if (!referenceRow) {
+            return;
+          }
+
+          const cells = Array.from(referenceRow.children);
+          if (cells.length !== columns.length) {
+            console.warn('排班表列宽锁定失败：列数不一致', {
+              columnCount: columns.length,
+              cellCount: cells.length,
+            });
+            return;
+          }
+
+          columns.forEach((col) => {
+            col.style.width = '';
+            col.style.minWidth = '';
+            col.style.maxWidth = '';
+          });
+
+          cells.forEach((cell, index) => {
+            const width = cell.getBoundingClientRect().width;
+            if (width <= 0) {
+              return;
+            }
+            const px = `${width}px`;
+            const col = columns[index];
+            col.style.width = px;
+            col.style.minWidth = px;
+            col.style.maxWidth = px;
+          });
+        });
       }
 
       function adjustWindowBounds() {
