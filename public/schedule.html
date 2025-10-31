@@ -72,7 +72,7 @@
       }
 
       .sticky-col-2 {
-        left: var(--schedule-date-width);
+        left: calc(var(--schedule-date-width) + 1px);
         width: var(--schedule-week-width);
         min-width: var(--schedule-week-width);
         box-shadow: inset -1px 0 0 rgba(148, 163, 184, 0.08);
@@ -89,6 +89,21 @@
 
       .schedule-table tbody tr:nth-child(even) td:not(.sticky-col-1):not(.sticky-col-2) {
         background: rgba(15, 23, 42, 0.82);
+      }
+
+      #schedule-colgroup col.schedule-col-date {
+        width: var(--schedule-date-width);
+        min-width: var(--schedule-date-width);
+      }
+
+      #schedule-colgroup col.schedule-col-week {
+        width: var(--schedule-week-width);
+        min-width: var(--schedule-week-width);
+      }
+
+      #schedule-colgroup col.schedule-col-emp {
+        width: var(--schedule-cell-min-width);
+        min-width: var(--schedule-cell-min-width);
       }
 
       .schedule-date-cell {
@@ -349,6 +364,7 @@
           </div>
           <div id="schedule-wrapper" class="relative overflow-auto max-h-[70vh]">
             <table class="schedule-table" aria-describedby="window-info">
+              <colgroup id="schedule-colgroup"></colgroup>
               <thead>
                 <tr id="schedule-head"></tr>
               </thead>
@@ -453,6 +469,7 @@
         scheduleHead: document.getElementById('schedule-head'),
         scheduleBody: document.getElementById('schedule-body'),
         scheduleWrapper: document.getElementById('schedule-wrapper'),
+        scheduleColgroup: document.getElementById('schedule-colgroup'),
         windowBack: document.getElementById('window-back'),
         windowForward: document.getElementById('window-forward'),
         emptyState: document.getElementById('empty-state'),
@@ -972,6 +989,7 @@
       function renderTable() {
         elements.scheduleHead.innerHTML = '';
         elements.scheduleBody.innerHTML = '';
+        elements.scheduleColgroup.innerHTML = '';
 
         if (!state.teamId || state.employees.length === 0 || state.days.length === 0) {
           elements.emptyState.classList.remove('hidden');
@@ -982,6 +1000,32 @@
         adjustWindowBounds();
         const endIndex = Math.min(state.windowStart + state.windowSize, state.days.length);
         const visibleDays = state.days.slice(state.windowStart, endIndex);
+        const expectedColumns = 2 + state.employees.length;
+
+        const colFragment = document.createDocumentFragment();
+        const dateCol = document.createElement('col');
+        dateCol.className = 'schedule-col-date';
+        colFragment.appendChild(dateCol);
+
+        const weekCol = document.createElement('col');
+        weekCol.className = 'schedule-col-week';
+        colFragment.appendChild(weekCol);
+
+        state.employees.forEach(() => {
+          const empCol = document.createElement('col');
+          empCol.className = 'schedule-col-emp';
+          colFragment.appendChild(empCol);
+        });
+
+        elements.scheduleColgroup.appendChild(colFragment);
+        console.assert(
+          elements.scheduleColgroup.children.length === expectedColumns,
+          '排班表列宽声明数量不匹配',
+          {
+            expected: expectedColumns,
+            actual: elements.scheduleColgroup.children.length,
+          },
+        );
 
         const headRow = document.createElement('tr');
         const dateTh = document.createElement('th');
@@ -1018,6 +1062,14 @@
         });
 
         elements.scheduleHead.appendChild(headRow);
+        console.assert(
+          headRow.children.length === expectedColumns,
+          '排班表表头列数异常',
+          {
+            expected: expectedColumns,
+            actual: headRow.children.length,
+          },
+        );
 
         const fragment = document.createDocumentFragment();
         visibleDays.forEach((day) => {
@@ -1099,6 +1151,15 @@
           });
 
           fragment.appendChild(tr);
+          console.assert(
+            tr.children.length === expectedColumns,
+            '排班表表体列数异常',
+            {
+              day: day.date,
+              expected: expectedColumns,
+              actual: tr.children.length,
+            },
+          );
         });
 
         elements.scheduleBody.appendChild(fragment);
