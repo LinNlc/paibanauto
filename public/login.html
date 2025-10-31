@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>排班助手 - 登录</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/public/app.css" />
+    <script src="/public/app.js"></script>
+  </head>
+  <body class="login-page min-h-screen flex items-center justify-center text-slate-100">
+    <div class="relative z-10 w-full max-w-md mx-auto px-6">
+      <div class="login-card rounded-3xl p-8 space-y-6">
+        <div class="text-center space-y-2">
+          <div class="text-sm uppercase tracking-[0.4em] text-sky-300/80">排班助手</div>
+          <h1 class="text-3xl font-semibold">欢迎回来</h1>
+          <p class="text-sm text-slate-400">请输入账号密码登录系统</p>
+        </div>
+        <form id="login-form" class="space-y-5">
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-slate-300" for="username">账号</label>
+            <input
+              id="username"
+              type="text"
+              name="username"
+              autocomplete="username"
+              placeholder="请输入账号"
+              required
+              class="w-full"
+            />
+          </div>
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-slate-300" for="password">密码</label>
+            <input
+              id="password"
+              type="password"
+              name="password"
+              autocomplete="current-password"
+              placeholder="请输入密码"
+              required
+              class="w-full"
+            />
+          </div>
+          <button
+            id="submit-btn"
+            type="submit"
+            class="btn-primary w-full flex items-center justify-center gap-2"
+          >
+            <span>登录</span>
+          </button>
+        </form>
+        <p class="text-xs text-center text-slate-500">默认账号 admin / admin，安装完成后请尽快修改。</p>
+      </div>
+    </div>
+    <script>
+      App.ready(() => {
+        const formEl = document.getElementById('login-form');
+        const submitBtn = document.getElementById('submit-btn');
+
+        formEl.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const username = (document.getElementById('username').value || '').trim();
+          const password = document.getElementById('password').value || '';
+
+          if (!username || !password) {
+            App.toast('请输入账号和密码');
+            return;
+          }
+
+          submitBtn.disabled = true;
+          submitBtn.classList.add('opacity-70');
+          submitBtn.innerHTML = '<span class="animate-pulse">登录中…</span>';
+
+          try {
+            const response = await fetch('/api/auth.php?action=login', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+              body: JSON.stringify({ username, password }),
+            });
+
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data || !data.ok) {
+              const message = (data && (data.msg || data.error)) || '登录失败，请稍后再试';
+              App.toast(message);
+              return;
+            }
+
+            App.toast('登录成功，即将跳转…', { type: 'success', duration: 1600 });
+            setTimeout(() => {
+              window.location.href = '/public/index.html';
+            }, 600);
+          } catch (error) {
+            App.toast('网络异常，请稍后再试');
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-70');
+            submitBtn.innerHTML = '<span>登录</span>';
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
