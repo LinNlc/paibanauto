@@ -72,7 +72,7 @@
       }
 
       .sticky-col-2 {
-        left: var(--schedule-date-width);
+        left: calc(var(--schedule-date-width) + 1px);
         width: var(--schedule-week-width);
         min-width: var(--schedule-week-width);
         box-shadow: inset -1px 0 0 rgba(148, 163, 184, 0.08);
@@ -89,6 +89,21 @@
 
       .schedule-table tbody tr:nth-child(even) td:not(.sticky-col-1):not(.sticky-col-2) {
         background: rgba(15, 23, 42, 0.82);
+      }
+
+      #schedule-colgroup col.schedule-col-date {
+        width: var(--schedule-date-width);
+        min-width: var(--schedule-date-width);
+      }
+
+      #schedule-colgroup col.schedule-col-week {
+        width: var(--schedule-week-width);
+        min-width: var(--schedule-week-width);
+      }
+
+      #schedule-colgroup col.schedule-col-emp {
+        width: var(--schedule-cell-min-width);
+        min-width: var(--schedule-cell-min-width);
       }
 
       .schedule-date-cell {
@@ -349,6 +364,7 @@
           </div>
           <div id="schedule-wrapper" class="relative overflow-auto max-h-[70vh]">
             <table class="schedule-table" aria-describedby="window-info">
+              <colgroup id="schedule-colgroup"></colgroup>
               <thead>
                 <tr id="schedule-head"></tr>
               </thead>
@@ -453,6 +469,7 @@
         scheduleHead: document.getElementById('schedule-head'),
         scheduleBody: document.getElementById('schedule-body'),
         scheduleWrapper: document.getElementById('schedule-wrapper'),
+        scheduleColgroup: document.getElementById('schedule-colgroup'),
         windowBack: document.getElementById('window-back'),
         windowForward: document.getElementById('window-forward'),
         emptyState: document.getElementById('empty-state'),
@@ -708,11 +725,11 @@
 
         teardownSSE();
         const params = new URLSearchParams({
-          team_id: state.teamId,
+          team: state.teamId,
           start: state.start,
           end: state.end,
         });
-        const source = new EventSource(`/api/sse.php?${params.toString()}`);
+        const source = new EventSource(`/api/sse?${params.toString()}`);
         source.addEventListener('op', handleSseOp);
         source.onopen = () => {
           if (sseReconnectTimer) {
@@ -845,6 +862,7 @@
         if (!elements.teamName) {
           return;
         }
+
         const controls = [
           elements.applyRange,
           elements.rangeToday,
@@ -865,49 +883,6 @@
           });
           return;
         }
-        const controls = [
-          elements.applyRange,
-          elements.rangeToday,
-          elements.rangePrev,
-          elements.rangeNext,
-          elements.windowBack,
-          elements.windowForward,
-          elements.startInput,
-          elements.endInput,
-          elements.windowSize,
-        ];
-
-        if (!state.teams.length) {
-          state.teamId = null;
-          elements.teamName.textContent = '暂无可访问团队';
-          controls.forEach((ctrl) => {
-            if (ctrl) ctrl.disabled = true;
-          });
-          return;
-        }
-        const controls = [
-          elements.applyRange,
-          elements.rangeToday,
-          elements.rangePrev,
-          elements.rangeNext,
-          elements.windowBack,
-          elements.windowForward,
-          elements.startInput,
-          elements.endInput,
-          elements.windowSize,
-        ];
-
-        if (!state.teams.length) {
-          state.teamId = null;
-          elements.teamName.textContent = '暂无可访问团队';
-          controls.forEach((ctrl) => {
-            if (ctrl) ctrl.disabled = true;
-          });
-          return;
-        }
-
-        const desiredId = Number(state.teamId);
-        let activeTeam = state.teams.find((team) => Number(team.id) === desiredId);
 
         const desiredId = Number(state.teamId);
         let activeTeam = state.teams.find((team) => Number(team.id) === desiredId);
@@ -934,6 +909,7 @@
           if (ctrl) ctrl.disabled = false;
         });
       }
+
 
       function updateHeader() {
         elements.userName.textContent = state.user ? state.user.display_name : '';
@@ -1009,9 +985,11 @@
         return days;
       }
 
+
       function renderTable() {
         elements.scheduleHead.innerHTML = '';
         elements.scheduleBody.innerHTML = '';
+        elements.scheduleColgroup.innerHTML = '';
 
         if (!state.teamId || state.employees.length === 0 || state.days.length === 0) {
           elements.emptyState.classList.remove('hidden');
@@ -1022,24 +1000,50 @@
         adjustWindowBounds();
         const endIndex = Math.min(state.windowStart + state.windowSize, state.days.length);
         const visibleDays = state.days.slice(state.windowStart, endIndex);
+        const expectedColumns = 2 + state.employees.length;
 
-        adjustWindowBounds();
-        const endIndex = Math.min(state.windowStart + state.windowSize, state.days.length);
-        const visibleDays = state.days.slice(state.windowStart, endIndex);
+        const colFragment = document.createDocumentFragment();
+        const dateCol = document.createElement('col');
+        dateCol.className = 'schedule-col-date';
+        colFragment.appendChild(dateCol);
+
+        const weekCol = document.createElement('col');
+        weekCol.className = 'schedule-col-week';
+        colFragment.appendChild(weekCol);
+
+        state.employees.forEach(() => {
+          const empCol = document.createElement('col');
+          empCol.className = 'schedule-col-emp';
+          colFragment.appendChild(empCol);
+        });
+
+        elements.scheduleColgroup.appendChild(colFragment);
+        console.assert(
+          elements.scheduleColgroup.children.length === expectedColumns,
+          '排班表列宽声明数量不匹配',
+          {
+            expected: expectedColumns,
+            actual: elements.scheduleColgroup.children.length,
+          },
+        );
 
         const headRow = document.createElement('tr');
-        const nameTh = document.createElement('th');
-        nameTh.className = 'sticky-col-1 text-left text-xs tracking-[0.3em] text-slate-400';
-        nameTh.textContent = '姓名';
-        headRow.appendChild(nameTh);
+        const dateTh = document.createElement('th');
+        dateTh.className = 'sticky-col-1 text-left text-xs tracking-[0.3em] text-slate-400';
+        dateTh.textContent = '日期';
+        headRow.appendChild(dateTh);
 
-        visibleDays.forEach((day) => {
+        const weekTh = document.createElement('th');
+        weekTh.className = 'sticky-col-2 text-left text-xs tracking-[0.3em] text-slate-400';
+        weekTh.textContent = '星期';
+        headRow.appendChild(weekTh);
+
+        state.employees.forEach((emp) => {
           const th = document.createElement('th');
           th.dataset.empId = String(emp.id);
           th.className = 'schedule-emp-head';
-          const displayName = emp.display_name || emp.name || `成员#${emp.id}`;
           const nameLine = document.createElement('span');
-          nameLine.textContent = displayName;
+          nameLine.textContent = emp.display_name || emp.name || `成员#${emp.id}`;
           const subLine = document.createElement('span');
           if (emp.display_name && emp.name && emp.display_name !== emp.name) {
             subLine.textContent = emp.name;
@@ -1058,9 +1062,17 @@
         });
 
         elements.scheduleHead.appendChild(headRow);
+        console.assert(
+          headRow.children.length === expectedColumns,
+          '排班表表头列数异常',
+          {
+            expected: expectedColumns,
+            actual: headRow.children.length,
+          },
+        );
 
         const fragment = document.createDocumentFragment();
-        state.employees.forEach((emp) => {
+        visibleDays.forEach((day) => {
           const tr = document.createElement('tr');
 
           const dateTd = document.createElement('td');
@@ -1084,7 +1096,7 @@
           weekTd.textContent = `周${day.weekday}`;
           tr.appendChild(weekTd);
 
-          visibleDays.forEach((day) => {
+          state.employees.forEach((emp) => {
             const td = document.createElement('td');
             td.dataset.empId = String(emp.id);
             td.dataset.day = day.date;
@@ -1125,7 +1137,10 @@
             }
 
             if (cellData.updated_at) {
-              const updater = cellData.updated_by && cellData.updated_by.display_name ? cellData.updated_by.display_name : '未知';
+              const updater =
+                cellData.updated_by && cellData.updated_by.display_name
+                  ? cellData.updated_by.display_name
+                  : '未知';
               td.title = `版本 ${cellData.version} · ${cellData.updated_at} · ${updater}`;
             } else {
               td.title = '';
@@ -1136,6 +1151,15 @@
           });
 
           fragment.appendChild(tr);
+          console.assert(
+            tr.children.length === expectedColumns,
+            '排班表表体列数异常',
+            {
+              day: day.date,
+              expected: expectedColumns,
+              actual: tr.children.length,
+            },
+          );
         });
 
         elements.scheduleBody.appendChild(fragment);
