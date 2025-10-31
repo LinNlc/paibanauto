@@ -38,6 +38,35 @@
         min-width: var(--schedule-emp-width);
         background: rgba(15, 23, 42, 0.75);
         white-space: nowrap;
+        position: relative;
+        box-sizing: border-box;
+      }
+
+      .schedule-table th:not(.sticky-col-1),
+      .schedule-table td:not(.sticky-col-1) {
+        width: var(--schedule-emp-width);
+        max-width: var(--schedule-emp-width);
+      }
+
+      .schedule-table th.sticky-col-1,
+      .schedule-table td.sticky-col-1 {
+        border-right: none;
+        width: var(--schedule-date-width);
+        min-width: var(--schedule-date-width);
+        max-width: var(--schedule-date-width);
+        overflow: hidden;
+      }
+
+      .schedule-table th.sticky-col-1::after,
+      .schedule-table td.sticky-col-1::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: -1px;
+        width: 1px;
+        background: rgba(148, 163, 184, 0.12);
+        pointer-events: none;
       }
 
       .schedule-table th.sticky-col-1,
