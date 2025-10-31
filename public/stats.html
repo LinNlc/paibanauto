@@ -173,6 +173,11 @@
 
       const CURRENT_VIEW = 'stats';
 
+      const storedTeamId = App.getPreferredTeamId();
+      if (storedTeamId) {
+        state.teamId = storedTeamId;
+      }
+
       function normalizeViewList(list) {
         if (!Array.isArray(list)) {
           return [];
@@ -232,6 +237,7 @@
 
       document.getElementById('apply-range').addEventListener('click', () => {
         state.teamId = teamSelect.value ? Number(teamSelect.value) : null;
+        App.setPreferredTeamId(state.teamId);
         loadPersonStats(true);
       });
 
@@ -241,6 +247,20 @@
 
       teamSelect.addEventListener('change', () => {
         state.teamId = teamSelect.value ? Number(teamSelect.value) : null;
+        App.setPreferredTeamId(state.teamId);
+        loadPersonStats(true);
+      });
+
+      App.on('team:change', (event) => {
+        const detail = event && typeof event === 'object' ? event.detail : null;
+        const nextId = detail && Number.isFinite(detail.teamId) ? detail.teamId : null;
+        if (nextId === state.teamId) {
+          return;
+        }
+        state.teamId = nextId;
+        if (nextId && state.teams.some((team) => team.id === nextId)) {
+          teamSelect.value = String(nextId);
+        }
         loadPersonStats(true);
       });
 
@@ -338,6 +358,8 @@
           state.shiftOptions = Array.isArray(data.shift_options) ? data.shift_options : [];
           state.targetWhite = Number.isFinite(data.target_white_per_month) ? Number(data.target_white_per_month) : 8;
           state.personRecords = Array.isArray(data.records) ? data.records : [];
+
+          App.setPreferredTeamId(state.teamId);
 
           updateFiltersFromState();
           renderTeams();

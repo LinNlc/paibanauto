@@ -124,6 +124,11 @@
 
       const CURRENT_VIEW = 'people';
 
+      const storedTeamId = App.getPreferredTeamId();
+      if (storedTeamId) {
+        state.teamId = storedTeamId;
+      }
+
       function normalizeViewList(list) {
         if (!Array.isArray(list)) {
           return [];
@@ -178,12 +183,26 @@
         if (!allowed) {
           return;
         }
-        await loadTeamData();
+        await loadTeamData(state.teamId);
+      });
+
+      App.on('team:change', (event) => {
+        const detail = event && typeof event === 'object' ? event.detail : null;
+        const nextId = detail && Number.isFinite(detail.teamId) ? detail.teamId : null;
+        if (nextId === state.teamId) {
+          return;
+        }
+        state.teamId = nextId;
+        if (nextId && state.teams.some((team) => team.id === nextId)) {
+          teamSelect.value = String(nextId);
+        }
+        loadTeamData(state.teamId);
       });
 
       teamSelect.addEventListener('change', async (event) => {
         const value = parseInt(event.target.value, 10);
         state.teamId = Number.isFinite(value) ? value : null;
+        App.setPreferredTeamId(state.teamId);
         await loadTeamData(state.teamId);
       });
 
@@ -297,6 +316,7 @@
           state.teamId = data.team_id || null;
           state.employees = Array.isArray(data.employees) ? data.employees : [];
           state.canEdit = Boolean(data.can_edit);
+          App.setPreferredTeamId(state.teamId);
           renderTeams();
           renderEmployees();
         } catch (error) {

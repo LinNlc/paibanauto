@@ -12,8 +12,9 @@
     <script src="./app.js"></script>
     <style>
       :root {
-        --schedule-date-width: 140px;
-        --schedule-week-width: 90px;
+        --schedule-date-width: 120px;
+        --schedule-week-width: 72px;
+        --schedule-cell-min-width: 88px;
       }
 
       .schedule-card {
@@ -27,15 +28,22 @@
         border-collapse: separate;
         border-spacing: 0;
         min-width: 100%;
+        table-layout: fixed;
       }
 
       .schedule-table th,
       .schedule-table td {
         border-right: 1px solid rgba(148, 163, 184, 0.08);
         border-bottom: 1px solid rgba(148, 163, 184, 0.08);
-        padding: 0.75rem 0.75rem;
-        min-width: 120px;
+        padding: 0.5rem 0.75rem;
+        min-width: var(--schedule-cell-min-width);
         background: rgba(15, 23, 42, 0.75);
+        white-space: nowrap;
+      }
+
+      .schedule-table th[data-emp-id],
+      .schedule-table td[data-emp-id] {
+        min-width: calc(var(--schedule-cell-min-width) + 8px);
       }
 
       .schedule-table th:last-child,
@@ -92,6 +100,8 @@
         border-radius: 0.85rem;
         transition: all 0.15s ease;
         font-weight: 500;
+        width: 100%;
+        padding: 0.25rem 0.5rem;
       }
 
       .schedule-cell.empty {
@@ -318,6 +328,11 @@
 
       const CURRENT_VIEW = 'schedule';
 
+      const storedTeamId = App.getPreferredTeamId();
+      if (storedTeamId) {
+        state.teamId = storedTeamId;
+      }
+
       function normalizeViewList(list) {
         if (!Array.isArray(list)) {
           return [];
@@ -427,10 +442,22 @@
         loadScheduleData();
       });
 
+      App.on('team:change', (event) => {
+        const detail = event && typeof event === 'object' ? event.detail : null;
+        const nextId = detail && Number.isFinite(detail.teamId) ? detail.teamId : null;
+        if (nextId === state.teamId) {
+          return;
+        }
+        state.teamId = nextId;
+        renderTeamOptions();
+        loadScheduleData();
+      });
+
       function attachEventListeners() {
         elements.teamSelect.addEventListener('change', () => {
           const value = parseInt(elements.teamSelect.value, 10);
           state.teamId = Number.isFinite(value) ? value : null;
+          App.setPreferredTeamId(state.teamId);
           loadScheduleData();
         });
 
@@ -590,6 +617,7 @@
 
           updateHeader();
           renderTeamOptions();
+          App.setPreferredTeamId(state.teamId);
           updateDateInputs();
           renderLegend();
           updateWindowInfo();
