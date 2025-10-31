@@ -32,52 +32,23 @@
 
       .schedule-table th,
       .schedule-table td {
-        border-right: 1px solid rgba(148, 163, 184, 0.08);
         border-bottom: 1px solid rgba(148, 163, 184, 0.08);
         padding: 0.5rem 0.75rem;
-        min-width: var(--schedule-emp-width);
         background: rgba(15, 23, 42, 0.75);
         white-space: nowrap;
         position: relative;
         box-sizing: border-box;
-      }
-
-      .schedule-table th:not(.sticky-col-1),
-      .schedule-table td:not(.sticky-col-1) {
-        width: var(--schedule-emp-width);
-        max-width: var(--schedule-emp-width);
-      }
-
-      .schedule-table th.sticky-col-1,
-      .schedule-table td.sticky-col-1 {
-        border-right: none;
-        width: var(--schedule-date-width);
-        min-width: var(--schedule-date-width);
-        max-width: var(--schedule-date-width);
-        overflow: hidden;
-      }
-
-      .schedule-table th.sticky-col-1::after,
-      .schedule-table td.sticky-col-1::after {
-        content: "";
-        position: absolute;
-        top: 0;
-        right: 0;
-        bottom: -1px;
-        width: 1px;
-        background: rgba(148, 163, 184, 0.12);
-        pointer-events: none;
-      }
-
-      .schedule-table th.sticky-col-1,
-      .schedule-table td.sticky-col-1 {
-        border-right: none;
         box-shadow: inset -1px 0 0 rgba(148, 163, 184, 0.12);
       }
 
       .schedule-table th:last-child,
       .schedule-table td:last-child {
-        border-right: none;
+        box-shadow: none;
+      }
+
+      .schedule-table th.sticky-col-1,
+      .schedule-table td.sticky-col-1 {
+        overflow: hidden;
       }
 
       .schedule-table thead th {
@@ -100,8 +71,6 @@
 
       .sticky-col-1 {
         left: 0;
-        width: var(--schedule-date-width);
-        min-width: var(--schedule-date-width);
       }
 
       .schedule-table tbody td.sticky-col-1 {
@@ -125,6 +94,7 @@
       .schedule-date-cell {
         display: flex;
         flex-direction: column;
+        align-items: flex-start;
         gap: 0.15rem;
         color: #e2e8f0;
         white-space: normal;
