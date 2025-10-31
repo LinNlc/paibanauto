@@ -8,8 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="./app.css?v=20240602" />
-    <script src="./app.js?v=20240602"></script>
+    <link rel="stylesheet" href="./app.css?v=20240605" />
+    <script src="./app.js?v=20240605"></script>
   </head>
   <body>
     <button type="button" class="app-sidebar-toggle" data-sidebar-toggle aria-label="展开菜单">
@@ -56,7 +56,7 @@
             </div>
             <div class="flex items-center gap-3 text-sm text-slate-300">
               <a href="./index.html" class="btn-secondary">返回首页</a>
-              <button id="logout-btn" class="btn-secondary">退出登录</button>
+              <button type="button" class="btn-secondary" data-action="logout">退出登录</button>
             </div>
           </div>
         </header>
@@ -85,6 +85,27 @@
                 <div id="metric-users-disabled" class="mt-3 text-3xl font-semibold text-rose-200">0</div>
               </div>
             </div>
+
+            <section class="bg-slate-950/60 border border-slate-800 rounded-2xl p-6 space-y-5">
+              <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="space-y-1">
+                  <h2 class="text-lg font-semibold text-slate-100">团队管理</h2>
+                  <p class="text-sm text-slate-400">新增、重命名或删除可切换的团队。</p>
+                </div>
+                <form id="team-form" class="flex flex-wrap items-center gap-3">
+                  <input
+                    id="team-name-input"
+                    type="text"
+                    class="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-600"
+                    placeholder="例如：白班A组"
+                    aria-label="团队名称"
+                  />
+                  <button type="submit" class="btn-primary">新增团队</button>
+                </form>
+              </div>
+              <p id="teams-empty" class="team-list-empty hidden">暂无团队，请先新增团队以供切换。</p>
+              <ul id="teams-list" class="team-list"></ul>
+            </section>
 
             <div class="grid gap-8 lg:grid-cols-[minmax(0,380px)_1fr]">
               <form id="user-form" class="bg-slate-950/60 border border-slate-800 rounded-2xl p-6 space-y-5">
@@ -208,7 +229,10 @@
         userResetPassword: document.getElementById('user-reset-password'),
         userDelete: document.getElementById('user-delete'),
         userNew: document.getElementById('user-new-btn'),
-        logout: document.getElementById('logout-btn'),
+        teamForm: document.getElementById('team-form'),
+        teamName: document.getElementById('team-name-input'),
+        teamList: document.getElementById('teams-list'),
+        teamEmpty: document.getElementById('teams-empty'),
         metricTotal: document.getElementById('metric-users-total'),
         metricActive: document.getElementById('metric-users-active'),
         metricDisabled: document.getElementById('metric-users-disabled'),
@@ -319,6 +343,67 @@
         const editableSelected = getSelectedTeamIds(elements.editableTeams);
         populateTeamSelect(elements.allowedTeams, allowedSelected);
         populateTeamSelect(elements.editableTeams, editableSelected);
+      }
+
+      function renderTeamsList() {
+        if (!elements.teamList) {
+          return;
+        }
+        if (!Array.isArray(state.teams) || state.teams.length === 0) {
+          elements.teamList.innerHTML = '';
+          if (elements.teamEmpty) {
+            elements.teamEmpty.classList.remove('hidden');
+          }
+          return;
+        }
+
+        if (elements.teamEmpty) {
+          elements.teamEmpty.classList.add('hidden');
+        }
+
+        const items = state.teams
+          .slice()
+          .sort((a, b) => a.id - b.id)
+          .map(
+            (team) => `
+              <li class="team-list-item" data-team-id="${team.id}">
+                <div class="team-list-info">
+                  <span class="font-semibold">${team.name}</span>
+                  <small>ID：${team.id}</small>
+                </div>
+                <div class="team-list-actions">
+                  <button type="button" class="team-action-btn" data-action="rename-team">重命名</button>
+                  <button type="button" class="team-action-btn danger" data-action="delete-team">删除</button>
+                </div>
+              </li>
+            `
+          )
+          .join('');
+
+        elements.teamList.innerHTML = items;
+      }
+
+      function syncTeamRecord(team) {
+        if (!team || typeof team.id !== 'number') {
+          return;
+        }
+        const idx = state.teams.findIndex((item) => item.id === team.id);
+        if (idx >= 0) {
+          state.teams.splice(idx, 1, team);
+        } else {
+          state.teams.push(team);
+        }
+        state.teams.sort((a, b) => a.id - b.id);
+        renderTeamsList();
+        refreshTeamSelectOptions();
+        renderUsersList();
+      }
+
+      function removeTeamRecordById(id) {
+        state.teams = state.teams.filter((team) => team.id !== id);
+        renderTeamsList();
+        refreshTeamSelectOptions();
+        renderUsersList();
       }
 
       function renderAllowedViewCheckboxes(selectedViews = []) {
@@ -449,7 +534,7 @@
       async function loadInitialData() {
         App.showLoading('正在加载权限数据…');
         try {
-          const meResp = await apiGet('../api/auth.php?action=me');
+          const meResp = await apiGet('/api/auth.php?action=me');
           if (!meResp.user || String(meResp.user.role || '').toLowerCase() !== 'admin') {
             throw new Error('FORBIDDEN');
           }
@@ -463,8 +548,8 @@
           elements.denied.classList.add('hidden');
 
           const [teamsResp, usersResp] = await Promise.all([
-            apiGet('../api/admin/teams.php'),
-            apiGet('../api/admin/users.php'),
+            apiGet('/api/admin/teams.php'),
+            apiGet('/api/admin/users.php'),
           ]);
 
           state.teams = Array.isArray(teamsResp.teams) ? teamsResp.teams : [];
@@ -472,6 +557,7 @@
           state.teams.sort((a, b) => a.id - b.id);
           state.users.sort((a, b) => a.id - b.id);
 
+          renderTeamsList();
           refreshTeamSelectOptions();
           renderAllowedViewCheckboxes([]);
           renderUsersList();
@@ -486,6 +572,94 @@
         } finally {
           App.hideLoading();
         }
+      }
+
+      if (elements.teamForm) {
+        elements.teamForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const name = elements.teamName ? elements.teamName.value.trim() : '';
+          if (!name) {
+            App.toast('请填写团队名称', { type: 'error' });
+            return;
+          }
+          try {
+            const result = await apiPost('/api/admin/teams.php', { action: 'create', name });
+            if (result.team) {
+              syncTeamRecord(result.team);
+              if (elements.teamName) {
+                elements.teamName.value = '';
+              }
+              App.toast('团队已创建', { type: 'success' });
+            }
+          } catch (err) {
+            App.toast(err.message || '创建团队失败', { type: 'error' });
+          }
+        });
+      }
+
+      if (elements.teamList) {
+        elements.teamList.addEventListener('click', async (event) => {
+          const target = event.target instanceof HTMLElement ? event.target : null;
+          if (!target) {
+            return;
+          }
+          const actionButton = target.closest('[data-action]');
+          if (!actionButton) {
+            return;
+          }
+          const action = actionButton.dataset.action;
+          const item = actionButton.closest('[data-team-id]');
+          if (!item) {
+            return;
+          }
+          const teamId = Number.parseInt(item.getAttribute('data-team-id') || '0', 10);
+          if (!Number.isInteger(teamId) || teamId <= 0) {
+            return;
+          }
+          const team = state.teams.find((entry) => entry.id === teamId);
+          if (!team) {
+            App.toast('未找到团队信息', { type: 'error' });
+            return;
+          }
+
+          if (action === 'rename-team') {
+            const nextName = window.prompt('请输入新的团队名称：', team.name);
+            if (nextName === null) {
+              return;
+            }
+            const trimmed = nextName.trim();
+            if (!trimmed) {
+              App.toast('团队名称不能为空', { type: 'error' });
+              return;
+            }
+            if (trimmed === team.name) {
+              return;
+            }
+            try {
+              const result = await apiPost('/api/admin/teams.php', { action: 'update', id: teamId, name: trimmed });
+              if (result.team) {
+                syncTeamRecord(result.team);
+                App.toast('团队名称已更新', { type: 'success' });
+              }
+            } catch (err) {
+              App.toast(err.message || '更新团队失败', { type: 'error' });
+            }
+            return;
+          }
+
+          if (action === 'delete-team') {
+            if (!window.confirm(`确定删除团队“${team.name}”吗？该操作无法撤销。`)) {
+              return;
+            }
+            try {
+              await apiPost('/api/admin/teams.php', { action: 'delete', id: teamId });
+              removeTeamRecordById(teamId);
+              App.toast('团队已删除', { type: 'success' });
+            } catch (err) {
+              App.toast(err.message || '删除团队失败', { type: 'error' });
+            }
+          }
+        });
       }
 
       elements.userForm.addEventListener('submit', async (event) => {
@@ -529,7 +703,7 @@
         }
 
         try {
-          const result = await apiPost('../api/admin/users.php', payload);
+          const result = await apiPost('/api/admin/users.php', payload);
           if (result.user) {
             syncUserRecord(result.user);
             resetUserForm();
@@ -579,7 +753,7 @@
           return;
         }
         try {
-          await apiPost('../api/admin/users.php', {
+          await apiPost('/api/admin/users.php', {
             action: 'reset_password',
             id: state.editingUserId,
             password: newPassword,
@@ -598,22 +772,12 @@
           return;
         }
         try {
-          await apiPost('../api/admin/users.php', { action: 'delete', id: state.editingUserId });
+          await apiPost('/api/admin/users.php', { action: 'delete', id: state.editingUserId });
           removeUserRecord(state.editingUserId);
           resetUserForm();
           App.toast('账号已删除', { type: 'success' });
         } catch (err) {
           App.toast(err.message || '删除失败', { type: 'error' });
-        }
-      });
-
-      elements.logout.addEventListener('click', async () => {
-        try {
-          await apiPost('../api/auth.php?action=logout', {});
-        } catch (err) {
-          console.warn(err);
-        } finally {
-          window.location.href = './login.html';
         }
       });
 

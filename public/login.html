@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>排班助手 - 登录</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="./app.css?v=20240602" />
-    <script src="./app.js?v=20240602"></script>
+    <link rel="stylesheet" href="./app.css?v=20240605" />
+    <script src="./app.js?v=20240605"></script>
   </head>
   <body class="login-page min-h-screen flex items-center justify-center text-slate-100">
     <div class="relative z-10 w-full max-w-md mx-auto px-6">
@@ -73,7 +73,7 @@
           submitBtn.innerHTML = '<span class="animate-pulse">登录中…</span>';
 
           try {
-            const response = await fetch('../api/auth.php?action=login', {
+            const response = await fetch('/api/auth.php?action=login', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

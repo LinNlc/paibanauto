@@ -8,8 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="./app.css?v=20240602" />
-    <script src="./app.js?v=20240602"></script>
+    <link rel="stylesheet" href="./app.css?v=20240605" />
+    <script src="./app.js?v=20240605"></script>
     <style>
       .dragging {
         opacity: 0.5;
@@ -55,7 +55,10 @@
               <h1 class="header-title">人员管理</h1>
               <p class="header-subtitle">维护各团队成员，支持批量新增、排序与激活状态调整。</p>
             </div>
-            <div class="text-sm text-slate-400">当前用户：<span id="user-name" class="text-slate-200"></span></div>
+            <div class="flex items-center gap-3 text-sm text-slate-400">
+              <span>当前用户：<span id="user-name" class="text-slate-200"></span></span>
+              <button type="button" class="btn-secondary" data-action="logout">退出登录</button>
+            </div>
           </div>
           <div class="app-toolbar">
             <div class="toolbar-group min-w-[200px]">
@@ -266,7 +269,7 @@
 
       async function ensureLoggedIn() {
         try {
-          const response = await fetch('../api/auth.php?action=me', {
+          const response = await fetch('/api/auth.php?action=me', {
             method: 'GET',
             credentials: 'include',
           });
@@ -307,7 +310,7 @@
         App.showLoading('正在加载员工数据…');
         try {
           const params = teamId ? `?team_id=${encodeURIComponent(teamId)}` : '';
-          const response = await fetch(`../api/employees.php${params}`, {
+          const response = await fetch(`/api/employees.php${params}`, {
             method: 'GET',
             credentials: 'include',
           });
@@ -560,7 +563,7 @@
 
       async function postEmployees(body) {
         try {
-          const response = await fetch('../api/employees.php', {
+          const response = await fetch('/api/employees.php', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },

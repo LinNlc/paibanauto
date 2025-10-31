@@ -8,8 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="./app.css?v=20240602" />
-    <script src="./app.js?v=20240602"></script>
+    <link rel="stylesheet" href="./app.css?v=20240605" />
+    <script src="./app.js?v=20240605"></script>
   </head>
   <body>
     <button type="button" class="app-sidebar-toggle" data-sidebar-toggle aria-label="展开菜单">
@@ -50,8 +50,9 @@
               <h1 class="header-title">欢迎回来</h1>
               <p class="header-subtitle">正在确认您的登录状态…</p>
             </div>
-            <div class="text-sm text-slate-400">
-              当前用户：<span id="user-name" class="text-slate-200">-</span>
+            <div class="flex items-center gap-3 text-sm text-slate-400">
+              <span>当前用户：<span id="user-name" class="text-slate-200">-</span></span>
+              <button type="button" class="btn-secondary" data-action="logout">退出登录</button>
             </div>
           </div>
         </header>
@@ -87,7 +88,7 @@
         App.initSidebar({ activeView: 'home' });
 
         try {
-          const response = await fetch('../api/auth.php?action=me', {
+          const response = await fetch('/api/auth.php?action=me', {
             method: 'GET',
             credentials: 'include',
           });
@@ -153,7 +154,7 @@
         }
 
         const preferredTeamId = App.getPreferredTeamId();
-        const teamData = await fetchTeamsForUser(user, allowedViews, preferredTeamId).catch(() => null);
+          const teamData = await fetchTeamsForUser(user, allowedViews, preferredTeamId).catch(() => null);
 
         if (!teamData || !Array.isArray(teamData.teams) || teamData.teams.length === 0) {
           select.innerHTML = '';
@@ -233,13 +234,13 @@
 
         if (view === 'schedule') {
           const query = params.toString();
-          url = `../api/schedule.php${query ? `?${query}` : ''}`;
+          url = `/api/schedule.php${query ? `?${query}` : ''}`;
         } else if (view === 'people') {
           const query = params.toString();
-          url = `../api/employees.php${query ? `?${query}` : ''}`;
+          url = `/api/employees.php${query ? `?${query}` : ''}`;
         } else if (view === 'stats') {
           params.set('action', 'by_person');
-          url = `../api/stats.php?${params.toString()}`;
+          url = `/api/stats.php?${params.toString()}`;
         } else {
           return null;
         }

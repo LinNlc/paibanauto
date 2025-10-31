@@ -8,8 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="./app.css?v=20240602" />
-    <script src="./app.js?v=20240602"></script>
+    <link rel="stylesheet" href="./app.css?v=20240605" />
+    <script src="./app.js?v=20240605"></script>
     <style>
       :root {
         --schedule-date-width: 160px;
@@ -296,6 +296,7 @@
             <div class="flex flex-col items-start gap-2 text-sm text-slate-400 sm:items-end">
               <div>当前用户：<span id="user-name" class="text-slate-200 font-medium"></span></div>
               <div id="edit-state" class="inline-flex items-center gap-2 text-xs px-3 py-1 rounded-full border border-slate-700/70 text-slate-300"></div>
+              <button type="button" class="btn-secondary sm:self-end" data-action="logout">退出登录</button>
             </div>
           </div>
           <div class="app-toolbar">
@@ -462,7 +463,7 @@
 
       async function ensureLoggedIn() {
         try {
-          const response = await fetch('../api/auth.php?action=me', {
+          const response = await fetch('/api/auth.php?action=me', {
             method: 'GET',
             credentials: 'include',
           });
@@ -628,7 +629,7 @@
             params.set('end', state.end);
           }
 
-          const baseUrl = '../api/schedule.php';
+          const baseUrl = '/api/schedule.php';
           const url = params.toString() ? `${baseUrl}?${params}` : baseUrl;
 
           let response;
@@ -711,7 +712,7 @@
           start: state.start,
           end: state.end,
         });
-        const source = new EventSource(`../api/sse.php?${params.toString()}`);
+        const source = new EventSource(`/api/sse.php?${params.toString()}`);
         source.addEventListener('op', handleSseOp);
         source.onopen = () => {
           if (sseReconnectTimer) {
@@ -842,6 +843,26 @@
 
       function updateTeamDisplay() {
         if (!elements.teamName) {
+          return;
+        }
+        const controls = [
+          elements.applyRange,
+          elements.rangeToday,
+          elements.rangePrev,
+          elements.rangeNext,
+          elements.windowBack,
+          elements.windowForward,
+          elements.startInput,
+          elements.endInput,
+          elements.windowSize,
+        ];
+
+        if (!state.teams.length) {
+          state.teamId = null;
+          elements.teamName.textContent = '暂无可访问团队';
+          controls.forEach((ctrl) => {
+            if (ctrl) ctrl.disabled = true;
+          });
           return;
         }
         const controls = [
@@ -1289,7 +1310,7 @@
 
         let response;
         try {
-          response = await fetch('../api/schedule.php', {
+          response = await fetch('/api/schedule.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',

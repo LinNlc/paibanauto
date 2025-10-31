@@ -21,9 +21,18 @@
   };
 
   const APP_META = {
-    version: '2024.06.02',
-    releasedAt: '2024-06-02 09:00',
+    version: '2024.06.05',
+    releasedAt: '2024-06-05 18:00',
     changelog: [
+      {
+        version: '2024.06.05',
+        releasedAt: '2024-06-05 18:00',
+        items: [
+          '修复排班页面的接口路径，恢复用户信息与班次数据的正常加载。',
+          '全站统一提供退出登录入口，支持一键安全登出。',
+          '权限设置页新增团队管理，支持新增、重命名和删除可切换的团队。',
+        ],
+      },
       {
         version: '2024.06.02',
         releasedAt: '2024-06-02 09:00',
@@ -83,6 +92,39 @@
     }
     App.emit('team:change', { teamId: App.getPreferredTeamId() });
   });
+
+  async function performLogout() {
+    try {
+      await fetch('/api/auth.php?action=logout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      });
+    } catch (error) {
+      console.warn('Failed to logout', error);
+    } finally {
+      window.location.href = './login.html';
+    }
+  }
+
+  App.logout = performLogout;
+
+  App.bindLogoutButtons = function bindLogoutButtons(root = document) {
+    const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
+    scope.querySelectorAll('[data-action="logout"]').forEach((button) => {
+      if (button.dataset.logoutBound === '1') {
+        return;
+      }
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        performLogout();
+      });
+      button.dataset.logoutBound = '1';
+    });
+  };
 
   let toastContainer;
   let toastHideTimer;
@@ -201,6 +243,8 @@
         document.body.classList.remove('sidebar-open');
       }
     });
+
+    App.bindLogoutButtons();
   };
 
   function populateSidebarMeta(sidebar) {

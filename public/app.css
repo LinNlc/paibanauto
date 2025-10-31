@@ -429,6 +429,76 @@ button {
   border-radius: 1.25rem;
 }
 
+.team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.team-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.team-list-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  color: rgba(226, 232, 240, 0.92);
+}
+
+.team-list-info small {
+  color: rgba(148, 163, 184, 0.6);
+  font-size: 0.7rem;
+}
+
+.team-list-actions {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.team-action-btn {
+  padding: 0.35rem 0.9rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.6);
+  color: rgba(226, 232, 240, 0.88);
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.team-action-btn:hover,
+.team-action-btn:focus {
+  border-color: rgba(94, 234, 212, 0.5);
+  color: rgba(16, 185, 129, 0.9);
+  background: rgba(45, 212, 191, 0.1);
+}
+
+.team-action-btn.danger {
+  border-color: rgba(248, 113, 113, 0.45);
+  color: rgba(248, 113, 113, 0.9);
+}
+
+.team-action-btn.danger:hover,
+.team-action-btn.danger:focus {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.6);
+  color: rgba(254, 202, 202, 0.95);
+}
+
+.team-list-empty {
+  color: rgba(148, 163, 184, 0.7);
+  font-size: 0.85rem;
+}
+
 .table-glass {
   width: 100%;
   border-collapse: separate;
