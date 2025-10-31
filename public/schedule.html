@@ -8,13 +8,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="./app.css" />
-    <script src="./app.js"></script>
+    <link rel="stylesheet" href="./app.css?v=20240601" />
+    <script src="./app.js?v=20240601"></script>
     <style>
       :root {
-        --schedule-date-width: 120px;
-        --schedule-week-width: 72px;
-        --schedule-cell-min-width: 88px;
+        --schedule-name-width: 180px;
+        --schedule-cell-min-width: 96px;
       }
 
       .schedule-card {
@@ -41,9 +40,9 @@
         white-space: nowrap;
       }
 
-      .schedule-table th[data-emp-id],
-      .schedule-table td[data-emp-id] {
-        min-width: calc(var(--schedule-cell-min-width) + 8px);
+      .schedule-table th[data-day],
+      .schedule-table td[data-day] {
+        min-width: calc(var(--schedule-cell-min-width) + 12px);
       }
 
       .schedule-table th:last-child,
@@ -57,39 +56,81 @@
         z-index: 30;
         background: rgba(30, 41, 59, 0.92);
         backdrop-filter: blur(6px);
-        text-transform: uppercase;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: rgba(226, 232, 240, 0.88);
+      }
+
+      .schedule-table thead th[data-day] {
+        white-space: normal;
+      }
+
+      .schedule-head-date {
+        display: block;
+        font-size: 0.85rem;
+        color: #f8fafc;
+      }
+
+      .schedule-head-week {
+        display: block;
+        margin-top: 0.25rem;
         font-size: 0.7rem;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(148, 163, 184, 0.75);
       }
 
       .sticky-col-1 {
         position: sticky;
         left: 0;
         z-index: 28;
-        width: var(--schedule-date-width);
-        min-width: var(--schedule-date-width);
+        width: var(--schedule-name-width);
+        min-width: var(--schedule-name-width);
         background: rgba(30, 41, 59, 0.95) !important;
         backdrop-filter: blur(6px);
       }
 
-      .sticky-col-2 {
-        position: sticky;
-        left: var(--schedule-date-width);
-        z-index: 27;
-        width: var(--schedule-week-width);
-        min-width: var(--schedule-week-width);
-        background: rgba(30, 41, 59, 0.92) !important;
-        backdrop-filter: blur(6px);
-      }
-
-      .schedule-table tbody td.sticky-col-1,
-      .schedule-table tbody td.sticky-col-2 {
+      .schedule-table tbody td.sticky-col-1 {
         background: rgba(15, 23, 42, 0.96) !important;
         box-shadow: inset -1px 0 0 rgba(148, 163, 184, 0.06);
       }
 
       .schedule-table tbody tr:nth-child(even) td {
         background: rgba(15, 23, 42, 0.82);
+      }
+
+      .schedule-name-cell {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+        color: #e2e8f0;
+        white-space: normal;
+      }
+
+      .schedule-name-status {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: rgba(56, 189, 248, 0.7);
+      }
+
+      .schedule-name-status.inactive {
+        background: rgba(248, 113, 113, 0.8);
+      }
+
+      .schedule-name-text {
+        display: inline-flex;
+        flex-direction: column;
+        gap: 0.15rem;
+      }
+
+      .schedule-name-text span:last-child {
+        font-size: 0.7rem;
+        color: rgba(148, 163, 184, 0.65);
       }
 
       .schedule-cell {
@@ -221,10 +262,23 @@
           <nav>
             <a href="./index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
             <a href="./people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
-            <a href="./schedule.html" data-view="schedule" class="is-active"><span class="nav-indicator"></span>排班表</span></a>
+            <a href="./schedule.html" data-view="schedule" class="is-active"><span class="nav-indicator"></span>排班表</a>
             <a href="./stats.html" data-view="stats"><span class="nav-indicator"></span>数据统计</a>
             <a href="../admin/index.html" data-view="admin"><span class="nav-indicator"></span>后台管理</a>
           </nav>
+          <section class="sidebar-meta">
+            <div class="sidebar-version">
+              <span class="sidebar-version-label">当前版本</span>
+              <div class="sidebar-version-value">
+                <span class="sidebar-version-number" data-app-version>—</span>
+                <span class="sidebar-version-date">更新时间：<span data-app-release>—</span></span>
+              </div>
+            </div>
+            <div class="sidebar-changelog">
+              <div class="sidebar-changelog-title">更新日志</div>
+              <ul class="sidebar-changelog-list" data-app-changelog></ul>
+            </div>
+          </section>
         </div>
       </aside>
       <main class="app-main space-y-8 pb-12">
@@ -245,9 +299,14 @@
           </div>
           <div class="app-toolbar">
             <div class="toolbar-controls flex-wrap gap-4">
-              <div class="toolbar-group min-w-[160px]">
-                <label for="team-select">选择团队</label>
-                <select id="team-select" class="select-input"></select>
+              <div class="toolbar-group min-w-[200px]">
+                <label class="block text-xs uppercase tracking-[0.25em] text-slate-500">当前团队</label>
+                <div
+                  id="team-name"
+                  class="mt-2 rounded-xl border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-sm text-slate-200"
+                >
+                  -
+                </div>
               </div>
               <div class="toolbar-group">
                 <label for="start-date">起始日期</label>
@@ -377,7 +436,7 @@
       let currentSseKey = '';
 
       const elements = {
-        teamSelect: document.getElementById('team-select'),
+        teamName: document.getElementById('team-name'),
         startInput: document.getElementById('start-date'),
         endInput: document.getElementById('end-date'),
         windowSize: document.getElementById('window-size'),
@@ -449,18 +508,11 @@
           return;
         }
         state.teamId = nextId;
-        renderTeamOptions();
+        updateTeamDisplay();
         loadScheduleData();
       });
 
       function attachEventListeners() {
-        elements.teamSelect.addEventListener('change', () => {
-          const value = parseInt(elements.teamSelect.value, 10);
-          state.teamId = Number.isFinite(value) ? value : null;
-          App.setPreferredTeamId(state.teamId);
-          loadScheduleData();
-        });
-
         elements.applyRange.addEventListener('click', () => {
           const startValue = (elements.startInput.value || '').trim();
           const endValue = (elements.endInput.value || '').trim();
@@ -616,7 +668,7 @@
           adjustWindowBounds();
 
           updateHeader();
-          renderTeamOptions();
+          updateTeamDisplay();
           App.setPreferredTeamId(state.teamId);
           updateDateInputs();
           renderLegend();
@@ -787,27 +839,54 @@
         }
       }
 
-      function renderTeamOptions() {
-        elements.teamSelect.innerHTML = '';
-        if (state.teams.length === 0) {
-          const option = document.createElement('option');
-          option.textContent = '暂无可用团队';
-          option.value = '';
-          elements.teamSelect.appendChild(option);
-          elements.teamSelect.disabled = true;
+      function updateTeamDisplay() {
+        if (!elements.teamName) {
+          return;
+        }
+        const controls = [
+          elements.applyRange,
+          elements.rangeToday,
+          elements.rangePrev,
+          elements.rangeNext,
+          elements.windowBack,
+          elements.windowForward,
+          elements.startInput,
+          elements.endInput,
+          elements.windowSize,
+        ];
+
+        if (!state.teams.length) {
+          state.teamId = null;
+          elements.teamName.textContent = '暂无可访问团队';
+          controls.forEach((ctrl) => {
+            if (ctrl) ctrl.disabled = true;
+          });
           return;
         }
 
-        elements.teamSelect.disabled = false;
-        state.teams.forEach((team) => {
-          const teamId = Number(team.id);
-          const option = document.createElement('option');
-          option.value = String(teamId);
-          option.textContent = `${team.name || '未命名团队'} (#${teamId})`;
-          if (state.teamId === teamId) {
-            option.selected = true;
+        const desiredId = Number(state.teamId);
+        let activeTeam = state.teams.find((team) => Number(team.id) === desiredId);
+
+        if (!activeTeam && (state.teamId === null || state.teamId === undefined)) {
+          activeTeam = state.teams[0];
+          if (activeTeam) {
+            state.teamId = activeTeam.id;
+            App.setPreferredTeamId(state.teamId);
           }
-          elements.teamSelect.appendChild(option);
+        }
+
+        if (!activeTeam) {
+          elements.teamName.textContent = '正在加载团队数据…';
+          controls.forEach((ctrl) => {
+            if (ctrl) ctrl.disabled = true;
+          });
+          return;
+        }
+
+        const name = activeTeam.name || `团队 #${activeTeam.id}`;
+        elements.teamName.textContent = `${name} (#${activeTeam.id})`;
+        controls.forEach((ctrl) => {
+          if (ctrl) ctrl.disabled = false;
         });
       }
 
@@ -896,50 +975,69 @@
 
         elements.emptyState.classList.add('hidden');
 
+        adjustWindowBounds();
+        const endIndex = Math.min(state.windowStart + state.windowSize, state.days.length);
+        const visibleDays = state.days.slice(state.windowStart, endIndex);
+
         const headRow = document.createElement('tr');
-        const dateTh = document.createElement('th');
-        dateTh.className = 'sticky-col-1 text-left text-xs tracking-[0.3em] text-slate-400';
-        dateTh.textContent = '日期';
-        headRow.appendChild(dateTh);
+        const nameTh = document.createElement('th');
+        nameTh.className = 'sticky-col-1 text-left text-xs tracking-[0.3em] text-slate-400';
+        nameTh.textContent = '姓名';
+        headRow.appendChild(nameTh);
 
-        const weekTh = document.createElement('th');
-        weekTh.className = 'sticky-col-2 text-left text-xs tracking-[0.3em] text-slate-400';
-        weekTh.textContent = '星期';
-        headRow.appendChild(weekTh);
-
-        state.employees.forEach((emp) => {
+        visibleDays.forEach((day) => {
           const th = document.createElement('th');
-          th.textContent = emp.display_name || emp.name || `成员#${emp.id}`;
-          th.dataset.empId = emp.id;
-          th.title = emp.active ? '可排班' : '已停用';
-          if (!emp.active) {
-            th.classList.add('opacity-60');
-          }
+          th.dataset.day = day.date;
+          const dateSpan = document.createElement('span');
+          dateSpan.className = 'schedule-head-date';
+          dateSpan.textContent = day.label;
+          const weekSpan = document.createElement('span');
+          weekSpan.className = 'schedule-head-week';
+          weekSpan.textContent = `周${day.weekday}`;
+          th.appendChild(dateSpan);
+          th.appendChild(weekSpan);
           headRow.appendChild(th);
         });
 
         elements.scheduleHead.appendChild(headRow);
 
-        adjustWindowBounds();
-        const endIndex = Math.min(state.windowStart + state.windowSize, state.days.length);
-        const visibleDays = state.days.slice(state.windowStart, endIndex);
-
         const fragment = document.createDocumentFragment();
-        visibleDays.forEach((day) => {
+        state.employees.forEach((emp) => {
           const tr = document.createElement('tr');
 
-          const dateTd = document.createElement('td');
-          dateTd.className = 'sticky-col-1 font-medium text-slate-200';
-          dateTd.textContent = day.label;
-          dateTd.dataset.day = day.date;
-          tr.appendChild(dateTd);
+          const nameTd = document.createElement('td');
+          nameTd.className = 'sticky-col-1 schedule-name-cell';
+          nameTd.dataset.empId = String(emp.id);
+          if (!emp.active) {
+            nameTd.classList.add('opacity-60');
+          }
 
-          const weekTd = document.createElement('td');
-          weekTd.className = 'sticky-col-2 text-slate-400';
-          weekTd.textContent = `周${day.weekday}`;
-          tr.appendChild(weekTd);
+          const statusDot = document.createElement('span');
+          statusDot.className = 'schedule-name-status';
+          if (!emp.active) {
+            statusDot.classList.add('inactive');
+          }
+          nameTd.appendChild(statusDot);
 
-          state.employees.forEach((emp) => {
+          const textWrap = document.createElement('span');
+          textWrap.className = 'schedule-name-text';
+          const displayName = emp.display_name || emp.name || `成员#${emp.id}`;
+          const mainLine = document.createElement('span');
+          mainLine.textContent = displayName;
+          textWrap.appendChild(mainLine);
+
+          const secondaryLine = document.createElement('span');
+          if (emp.display_name && emp.name && emp.display_name !== emp.name) {
+            secondaryLine.textContent = emp.name;
+          } else {
+            secondaryLine.textContent = `ID: ${emp.id}`;
+          }
+          textWrap.appendChild(secondaryLine);
+
+          nameTd.appendChild(textWrap);
+          tr.appendChild(nameTd);
+
+          visibleDays.forEach((day) => {
             const td = document.createElement('td');
             td.dataset.empId = String(emp.id);
             td.dataset.day = day.date;

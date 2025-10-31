@@ -20,6 +20,24 @@
     },
   };
 
+  const APP_META = {
+    version: '2024.06.01',
+    releasedAt: '2024-06-01 10:00',
+    changelog: [
+      {
+        version: '2024.06.01',
+        releasedAt: '2024-06-01 10:00',
+        items: [
+          '修复排班表中姓名列与班次列的错位问题。',
+          '仅在首页提供团队切换，其它页面自动跟随所选团队。',
+          '新增侧边栏版本信息与更新日志，并通过版本号刷新静态资源缓存。',
+        ],
+      },
+    ],
+  };
+
+  App.meta = APP_META;
+
   const TEAM_STORAGE_KEY = 'paiban:selected-team-id';
 
   function normalizeTeamId(value) {
@@ -165,6 +183,8 @@
           document.body.classList.remove('sidebar-open');
         });
       });
+
+      populateSidebarMeta(sidebar);
     }
 
     document.addEventListener('keyup', (event) => {
@@ -173,6 +193,64 @@
       }
     });
   };
+
+  function populateSidebarMeta(sidebar) {
+    if (!sidebar) {
+      return;
+    }
+    const versionTarget = sidebar.querySelector('[data-app-version]');
+    const releaseTarget = sidebar.querySelector('[data-app-release]');
+    const changelogTarget = sidebar.querySelector('[data-app-changelog]');
+
+    if (versionTarget) {
+      versionTarget.textContent = APP_META.version;
+    }
+
+    if (releaseTarget) {
+      releaseTarget.textContent = APP_META.releasedAt;
+    }
+
+    if (changelogTarget) {
+      changelogTarget.innerHTML = '';
+      if (Array.isArray(APP_META.changelog) && APP_META.changelog.length) {
+        APP_META.changelog.forEach((entry) => {
+          const item = document.createElement('li');
+          item.className = 'sidebar-changelog-item';
+
+          const header = document.createElement('div');
+          header.className = 'sidebar-changelog-item-header';
+          const versionSpan = document.createElement('span');
+          versionSpan.className = 'sidebar-changelog-version';
+          versionSpan.textContent = `v${entry.version}`;
+          const dateSpan = document.createElement('span');
+          dateSpan.className = 'sidebar-changelog-date';
+          dateSpan.textContent = entry.releasedAt || '';
+          header.appendChild(versionSpan);
+          header.appendChild(dateSpan);
+
+          const list = document.createElement('ul');
+          list.className = 'sidebar-changelog-item-list';
+          if (Array.isArray(entry.items)) {
+            entry.items.forEach((text) => {
+              if (!text) return;
+              const li = document.createElement('li');
+              li.textContent = text;
+              list.appendChild(li);
+            });
+          }
+
+          item.appendChild(header);
+          item.appendChild(list);
+          changelogTarget.appendChild(item);
+        });
+      } else {
+        const empty = document.createElement('li');
+        empty.className = 'sidebar-changelog-empty';
+        empty.textContent = '暂无更新记录';
+        changelogTarget.appendChild(empty);
+      }
+    }
+  }
 
   App.registerGlobalShortcuts = function registerGlobalShortcuts(map) {
     document.addEventListener('keydown', (event) => {

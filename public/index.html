@@ -8,8 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="./app.css" />
-    <script src="./app.js"></script>
+    <link rel="stylesheet" href="./app.css?v=20240601" />
+    <script src="./app.js?v=20240601"></script>
   </head>
   <body>
     <button type="button" class="app-sidebar-toggle" data-sidebar-toggle aria-label="展开菜单">
@@ -28,6 +28,19 @@
             <a href="./stats.html" data-view="stats"><span class="nav-indicator"></span>数据统计</a>
             <a href="../admin/index.html" data-view="admin"><span class="nav-indicator"></span>后台管理</a>
           </nav>
+          <section class="sidebar-meta">
+            <div class="sidebar-version">
+              <span class="sidebar-version-label">当前版本</span>
+              <div class="sidebar-version-value">
+                <span class="sidebar-version-number" data-app-version>—</span>
+                <span class="sidebar-version-date">更新时间：<span data-app-release>—</span></span>
+              </div>
+            </div>
+            <div class="sidebar-changelog">
+              <div class="sidebar-changelog-title">更新日志</div>
+              <ul class="sidebar-changelog-list" data-app-changelog></ul>
+            </div>
+          </section>
         </div>
       </aside>
       <main class="app-main">
@@ -59,7 +72,7 @@
           </div>
           <p id="team-switch-empty" class="text-sm text-slate-500 hidden">暂无可切换的团队。</p>
           <p id="team-switch-hint" class="text-xs text-slate-500">
-            切换后重新进入排班、人员或统计页面即可查看所选团队的数据。
+            切换后其它模块将自动采用所选团队，重新进入页面即可看到最新排班。
           </p>
         </section>
         <section class="card-surface space-y-4 text-center">
