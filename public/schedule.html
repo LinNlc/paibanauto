@@ -1000,7 +1000,7 @@
           },
         );
 
-        const headRow = document.createElement('tr');
+        const headRow = elements.scheduleHead;
         const dateTh = document.createElement('th');
         dateTh.className = 'sticky-col-1 text-left text-xs tracking-[0.3em] text-slate-400';
         dateTh.textContent = '日期';
@@ -1027,8 +1027,6 @@
           }
           headRow.appendChild(th);
         });
-
-        elements.scheduleHead.appendChild(headRow);
         console.assert(
           headRow.children.length === expectedColumns,
           '排班表表头列数异常',
@@ -1145,8 +1143,9 @@
             return;
           }
 
+          const headerRow = elements.scheduleHead;
           const referenceRow =
-            elements.scheduleBody.querySelector('tr') || elements.scheduleHead.querySelector('tr');
+            elements.scheduleBody.querySelector('tr') || (headerRow && headerRow.children.length ? headerRow : null);
           if (!referenceRow) {
             return;
           }
