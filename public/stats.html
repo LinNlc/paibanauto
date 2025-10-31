@@ -9,8 +9,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="./app.css" />
-    <script src="./app.js"></script>
+    <link rel="stylesheet" href="./app.css?v=20240601" />
+    <script src="./app.js?v=20240601"></script>
   </head>
   <body>
     <button type="button" class="app-sidebar-toggle" data-sidebar-toggle aria-label="展开菜单">
@@ -29,6 +29,19 @@
             <a href="./stats.html" data-view="stats" class="is-active"><span class="nav-indicator"></span>数据统计</a>
             <a href="../admin/index.html" data-view="admin"><span class="nav-indicator"></span>后台管理</a>
           </nav>
+          <section class="sidebar-meta">
+            <div class="sidebar-version">
+              <span class="sidebar-version-label">当前版本</span>
+              <div class="sidebar-version-value">
+                <span class="sidebar-version-number" data-app-version>—</span>
+                <span class="sidebar-version-date">更新时间：<span data-app-release>—</span></span>
+              </div>
+            </div>
+            <div class="sidebar-changelog">
+              <div class="sidebar-changelog-title">更新日志</div>
+              <ul class="sidebar-changelog-list" data-app-changelog></ul>
+            </div>
+          </section>
         </div>
       </aside>
       <main class="app-main space-y-8 pb-12">
@@ -46,9 +59,14 @@
           </div>
           <div class="app-toolbar">
             <div class="toolbar-controls flex-wrap gap-4">
-              <div class="toolbar-group min-w-[160px]">
-                <label for="team-select">选择团队</label>
-                <select id="team-select" class="select-input"></select>
+              <div class="toolbar-group min-w-[200px]">
+                <label class="block text-xs uppercase tracking-[0.25em] text-slate-500">当前团队</label>
+                <div
+                  id="team-name"
+                  class="mt-2 rounded-xl border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-sm text-slate-200"
+                >
+                  -
+                </div>
               </div>
               <div class="toolbar-group">
                 <label for="start-date">起始日期</label>
@@ -173,6 +191,11 @@
 
       const CURRENT_VIEW = 'stats';
 
+      const storedTeamId = App.getPreferredTeamId();
+      if (storedTeamId) {
+        state.teamId = storedTeamId;
+      }
+
       function normalizeViewList(list) {
         if (!Array.isArray(list)) {
           return [];
@@ -211,7 +234,7 @@
         });
       }
 
-      const teamSelect = document.getElementById('team-select');
+      const teamNameDisplay = document.getElementById('team-name');
       const startInput = document.getElementById('start-date');
       const endInput = document.getElementById('end-date');
       const rangeInfo = document.getElementById('range-info');
@@ -231,7 +254,6 @@
       tabCoverage.addEventListener('click', () => switchTab('coverage'));
 
       document.getElementById('apply-range').addEventListener('click', () => {
-        state.teamId = teamSelect.value ? Number(teamSelect.value) : null;
         loadPersonStats(true);
       });
 
@@ -239,8 +261,14 @@
         loadPersonStats(true);
       });
 
-      teamSelect.addEventListener('change', () => {
-        state.teamId = teamSelect.value ? Number(teamSelect.value) : null;
+      App.on('team:change', (event) => {
+        const detail = event && typeof event === 'object' ? event.detail : null;
+        const nextId = detail && Number.isFinite(detail.teamId) ? detail.teamId : null;
+        if (nextId === state.teamId) {
+          return;
+        }
+        state.teamId = nextId;
+        updateTeamDisplay();
         loadPersonStats(true);
       });
 
@@ -339,8 +367,10 @@
           state.targetWhite = Number.isFinite(data.target_white_per_month) ? Number(data.target_white_per_month) : 8;
           state.personRecords = Array.isArray(data.records) ? data.records : [];
 
+          App.setPreferredTeamId(state.teamId);
+
           updateFiltersFromState();
-          renderTeams();
+          updateTeamDisplay();
           renderInfo();
           renderPersonTable();
           state.coverageKey = '';
@@ -399,37 +429,49 @@
         }
       }
 
-      function renderTeams() {
-        teamSelect.innerHTML = '';
+      function updateTeamDisplay() {
+        const applyBtn = document.getElementById('apply-range');
+        const refreshBtn = document.getElementById('refresh-btn');
+        if (!teamNameDisplay) {
+          return;
+        }
         if (!state.teams.length) {
-          const option = document.createElement('option');
-          option.textContent = '暂无可访问团队';
-          option.disabled = true;
-          option.selected = true;
-          teamSelect.appendChild(option);
-          teamSelect.disabled = true;
+          state.teamId = null;
+          teamNameDisplay.textContent = '暂无可访问团队';
           startInput.disabled = true;
           endInput.disabled = true;
-          document.getElementById('apply-range').disabled = true;
-          document.getElementById('refresh-btn').disabled = true;
+          if (applyBtn) applyBtn.disabled = true;
+          if (refreshBtn) refreshBtn.disabled = true;
           return;
         }
 
-        teamSelect.disabled = false;
+        const desiredId = Number(state.teamId);
+        let activeTeam = state.teams.find((team) => Number(team.id) === desiredId);
+
+        if (!activeTeam && (state.teamId === null || state.teamId === undefined)) {
+          activeTeam = state.teams[0];
+          if (activeTeam) {
+            state.teamId = activeTeam.id;
+            App.setPreferredTeamId(state.teamId);
+          }
+        }
+
+        if (!activeTeam) {
+          teamNameDisplay.textContent = '正在加载团队数据…';
+          startInput.disabled = true;
+          endInput.disabled = true;
+          if (applyBtn) applyBtn.disabled = true;
+          if (refreshBtn) refreshBtn.disabled = true;
+          return;
+        }
+
+        const name = activeTeam.name || `团队 #${activeTeam.id}`;
+        teamNameDisplay.textContent = `${name} (#${activeTeam.id})`;
+
         startInput.disabled = false;
         endInput.disabled = false;
-        document.getElementById('apply-range').disabled = false;
-        document.getElementById('refresh-btn').disabled = false;
-
-        state.teams.forEach((team) => {
-          const option = document.createElement('option');
-          option.value = team.id;
-          option.textContent = team.name;
-          if (team.id === state.teamId) {
-            option.selected = true;
-          }
-          teamSelect.appendChild(option);
-        });
+        if (applyBtn) applyBtn.disabled = false;
+        if (refreshBtn) refreshBtn.disabled = false;
       }
 
       function updateFiltersFromState() {
