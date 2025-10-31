@@ -8,8 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="./app.css" />
-    <script src="./app.js"></script>
+    <link rel="stylesheet" href="./app.css?v=20240602" />
+    <script src="./app.js?v=20240602"></script>
     <style>
       .dragging {
         opacity: 0.5;
@@ -31,8 +31,21 @@
             <a href="./people.html" data-view="people" class="is-active"><span class="nav-indicator"></span>人员管理</a>
             <a href="./schedule.html" data-view="schedule"><span class="nav-indicator"></span>排班表</a>
             <a href="./stats.html" data-view="stats"><span class="nav-indicator"></span>数据统计</a>
-            <a href="../admin/index.html" data-view="admin"><span class="nav-indicator"></span>后台管理</a>
+            <a href="./admin.html" data-view="admin"><span class="nav-indicator"></span>权限设置</a>
           </nav>
+          <section class="sidebar-meta">
+            <div class="sidebar-version">
+              <span class="sidebar-version-label">当前版本</span>
+              <div class="sidebar-version-value">
+                <span class="sidebar-version-number" data-app-version>—</span>
+                <span class="sidebar-version-date">更新时间：<span data-app-release>—</span></span>
+              </div>
+            </div>
+            <div class="sidebar-changelog">
+              <div class="sidebar-changelog-title">更新日志</div>
+              <ul class="sidebar-changelog-list" data-app-changelog></ul>
+            </div>
+          </section>
         </div>
       </aside>
       <main class="app-main space-y-6">
@@ -45,9 +58,14 @@
             <div class="text-sm text-slate-400">当前用户：<span id="user-name" class="text-slate-200"></span></div>
           </div>
           <div class="app-toolbar">
-            <div class="toolbar-group">
-              <label for="team-select">选择团队</label>
-              <select id="team-select" class="select-input"></select>
+            <div class="toolbar-group min-w-[200px]">
+              <label class="block text-xs uppercase tracking-[0.25em] text-slate-500">当前团队</label>
+              <div
+                id="team-name"
+                class="mt-2 rounded-xl border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-sm text-slate-200"
+              >
+                -
+              </div>
             </div>
             <div class="toolbar-controls">
               <button id="bulk-add-btn" type="button" class="btn-primary">批量新增</button>
@@ -124,6 +142,11 @@
 
       const CURRENT_VIEW = 'people';
 
+      const storedTeamId = App.getPreferredTeamId();
+      if (storedTeamId) {
+        state.teamId = storedTeamId;
+      }
+
       function normalizeViewList(list) {
         if (!Array.isArray(list)) {
           return [];
@@ -162,7 +185,7 @@
         });
       }
 
-      const teamSelect = document.getElementById('team-select');
+      const teamNameDisplay = document.getElementById('team-name');
       const employeeBody = document.getElementById('employee-body');
       const emptyHint = document.getElementById('empty-hint');
       const bulkModal = document.getElementById('bulk-modal');
@@ -178,13 +201,18 @@
         if (!allowed) {
           return;
         }
-        await loadTeamData();
+        await loadTeamData(state.teamId);
       });
 
-      teamSelect.addEventListener('change', async (event) => {
-        const value = parseInt(event.target.value, 10);
-        state.teamId = Number.isFinite(value) ? value : null;
-        await loadTeamData(state.teamId);
+      App.on('team:change', (event) => {
+        const detail = event && typeof event === 'object' ? event.detail : null;
+        const nextId = detail && Number.isFinite(detail.teamId) ? detail.teamId : null;
+        if (nextId === state.teamId) {
+          return;
+        }
+        state.teamId = nextId;
+        updateTeamDisplay();
+        loadTeamData(state.teamId);
       });
 
       bulkAddBtn.addEventListener('click', () => {
@@ -297,7 +325,8 @@
           state.teamId = data.team_id || null;
           state.employees = Array.isArray(data.employees) ? data.employees : [];
           state.canEdit = Boolean(data.can_edit);
-          renderTeams();
+          App.setPreferredTeamId(state.teamId);
+          updateTeamDisplay();
           renderEmployees();
         } catch (error) {
           App.toast('网络异常，请稍后再试');
@@ -307,29 +336,36 @@
         }
       }
 
-      function renderTeams() {
-        teamSelect.innerHTML = '';
+      function updateTeamDisplay() {
+        if (!teamNameDisplay) {
+          return;
+        }
         if (!state.teams.length) {
-          const option = document.createElement('option');
-          option.textContent = '暂无可访问团队';
-          option.disabled = true;
-          option.selected = true;
-          teamSelect.appendChild(option);
-          teamSelect.disabled = true;
+          state.teamId = null;
+          teamNameDisplay.textContent = '暂无可访问团队';
           bulkAddBtn.disabled = true;
           return;
         }
-        state.teams.forEach((team) => {
-          const option = document.createElement('option');
-          option.value = team.id;
-          option.textContent = team.name;
-          if (team.id === state.teamId) {
-            option.selected = true;
+        const desiredId = Number(state.teamId);
+        let activeTeam = state.teams.find((team) => Number(team.id) === desiredId);
+
+        if (!activeTeam && (state.teamId === null || state.teamId === undefined)) {
+          activeTeam = state.teams[0];
+          if (activeTeam) {
+            state.teamId = activeTeam.id;
+            App.setPreferredTeamId(state.teamId);
           }
-          teamSelect.appendChild(option);
-        });
-        teamSelect.disabled = false;
-        bulkAddBtn.disabled = !state.canEdit;
+        }
+
+        if (!activeTeam) {
+          teamNameDisplay.textContent = '正在加载团队数据…';
+          bulkAddBtn.disabled = true;
+          return;
+        }
+
+        const name = activeTeam.name || `团队 #${activeTeam.id}`;
+        teamNameDisplay.textContent = `${name} (#${activeTeam.id})`;
+        bulkAddBtn.disabled = !state.canEdit || !state.teamId;
       }
 
       function renderEmployees() {

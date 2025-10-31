@@ -8,8 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="./app.css" />
-    <script src="./app.js"></script>
+    <link rel="stylesheet" href="./app.css?v=20240602" />
+    <script src="./app.js?v=20240602"></script>
   </head>
   <body>
     <button type="button" class="app-sidebar-toggle" data-sidebar-toggle aria-label="展开菜单">
@@ -26,8 +26,21 @@
             <a href="./people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
             <a href="./schedule.html" data-view="schedule"><span class="nav-indicator"></span>排班表</a>
             <a href="./stats.html" data-view="stats"><span class="nav-indicator"></span>数据统计</a>
-            <a href="../admin/index.html" data-view="admin"><span class="nav-indicator"></span>后台管理</a>
+            <a href="./admin.html" data-view="admin"><span class="nav-indicator"></span>权限设置</a>
           </nav>
+          <section class="sidebar-meta">
+            <div class="sidebar-version">
+              <span class="sidebar-version-label">当前版本</span>
+              <div class="sidebar-version-value">
+                <span class="sidebar-version-number" data-app-version>—</span>
+                <span class="sidebar-version-date">更新时间：<span data-app-release>—</span></span>
+              </div>
+            </div>
+            <div class="sidebar-changelog">
+              <div class="sidebar-changelog-title">更新日志</div>
+              <ul class="sidebar-changelog-list" data-app-changelog></ul>
+            </div>
+          </section>
         </div>
       </aside>
       <main class="app-main">
@@ -42,6 +55,26 @@
             </div>
           </div>
         </header>
+        <section id="team-switch" class="card-surface space-y-4 hidden">
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="space-y-1">
+              <h2 class="text-xl font-semibold text-slate-100">团队切换</h2>
+              <p class="text-sm text-slate-400">选择的团队将在所有模块中保持一致。</p>
+            </div>
+            <div class="min-w-[220px]">
+              <label
+                for="home-team-select"
+                class="block text-xs uppercase tracking-[0.25em] text-slate-500"
+                >当前团队</label
+              >
+              <select id="home-team-select" class="select-input mt-2"></select>
+            </div>
+          </div>
+          <p id="team-switch-empty" class="text-sm text-slate-500 hidden">暂无可切换的团队。</p>
+          <p id="team-switch-hint" class="text-xs text-slate-500">
+            切换后其它模块将自动采用所选团队，重新进入页面即可看到最新排班。
+          </p>
+        </section>
         <section class="card-surface space-y-4 text-center">
           <h2 id="status-text" class="text-2xl font-semibold">正在验证登录状态…</h2>
           <p id="status-detail" class="text-slate-400">请稍候。</p>
@@ -73,7 +106,7 @@
           const { user } = data;
           document.getElementById('user-name').textContent = user.display_name || user.username;
           document.getElementById('status-text').textContent = `欢迎回来，${user.display_name}`;
-          document.getElementById('status-detail').textContent = '请选择左侧模块开始排班或查看统计。';
+          document.getElementById('status-detail').textContent = '请选择左侧模块或切换所需团队开始工作。';
 
           const allowedViews = Array.isArray(user.allowed_views)
             ? user.allowed_views
@@ -87,10 +120,144 @@
               link.classList.add('hidden');
             }
           });
+
+          setupTeamSwitcher(user, allowedViews);
         } catch (error) {
           window.location.href = './login.html';
         }
       });
+
+      function normalizeAllowedViews(views) {
+        if (!Array.isArray(views)) {
+          return [];
+        }
+        return views
+          .map((item) => String(item || '').toLowerCase())
+          .filter((item, index, arr) => item && arr.indexOf(item) === index);
+      }
+
+      async function setupTeamSwitcher(user, rawAllowedViews) {
+        const container = document.getElementById('team-switch');
+        const select = document.getElementById('home-team-select');
+        const emptyHint = document.getElementById('team-switch-empty');
+        const hint = document.getElementById('team-switch-hint');
+
+        if (!container || !select) {
+          return;
+        }
+
+        const allowedViews = normalizeAllowedViews(rawAllowedViews);
+        if (allowedViews.length === 0 && String(user.role || '').toLowerCase() !== 'admin') {
+          container.classList.add('hidden');
+          return;
+        }
+
+        const preferredTeamId = App.getPreferredTeamId();
+        const teamData = await fetchTeamsForUser(user, allowedViews, preferredTeamId).catch(() => null);
+
+        if (!teamData || !Array.isArray(teamData.teams) || teamData.teams.length === 0) {
+          select.innerHTML = '';
+          select.disabled = true;
+          emptyHint.classList.remove('hidden');
+          hint.classList.add('hidden');
+          container.classList.remove('hidden');
+          App.setPreferredTeamId(null);
+          return;
+        }
+
+        emptyHint.classList.add('hidden');
+        hint.classList.remove('hidden');
+        select.innerHTML = '';
+
+        const activeTeamId = teamData.teamId || preferredTeamId || (teamData.teams[0] && teamData.teams[0].id);
+
+        teamData.teams.forEach((team) => {
+          const option = document.createElement('option');
+          option.value = team.id;
+          option.textContent = team.name;
+          if (team.id === activeTeamId) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+
+        select.disabled = false;
+        container.classList.remove('hidden');
+
+        App.setPreferredTeamId(activeTeamId || null);
+
+        if (!select.dataset.boundChange) {
+          select.addEventListener('change', (event) => {
+            const value = Number.parseInt(event.target.value, 10);
+            const teamId = Number.isFinite(value) && value > 0 ? value : null;
+            App.setPreferredTeamId(teamId);
+            if (teamId) {
+              App.toast('团队切换已保存，将在各模块生效。', { type: 'success', duration: 2000 });
+            }
+          });
+          select.dataset.boundChange = '1';
+        }
+      }
+
+      async function fetchTeamsForUser(user, allowedViews, preferredTeamId) {
+        const candidates = buildCandidateViews(user, allowedViews);
+        for (const view of candidates) {
+          try {
+            const result = await fetchTeamsByView(view, preferredTeamId);
+            if (result && Array.isArray(result.teams)) {
+              return result;
+            }
+          } catch (error) {
+            /* 忽略并尝试下一个视图 */
+          }
+        }
+        return null;
+      }
+
+      function buildCandidateViews(user, allowedViews) {
+        const normalizedRole = String(user.role || '').toLowerCase();
+        const set = new Set(allowedViews);
+        if (set.has('*') || normalizedRole === 'admin') {
+          return ['schedule', 'people', 'stats'];
+        }
+        const preferredOrder = ['schedule', 'people', 'stats'];
+        return preferredOrder.filter((view) => set.has(view));
+      }
+
+      async function fetchTeamsByView(view, preferredTeamId) {
+        let url = '';
+        const params = new URLSearchParams();
+        if (preferredTeamId) {
+          params.set('team_id', String(preferredTeamId));
+        }
+
+        if (view === 'schedule') {
+          const query = params.toString();
+          url = `../api/schedule.php${query ? `?${query}` : ''}`;
+        } else if (view === 'people') {
+          const query = params.toString();
+          url = `../api/employees.php${query ? `?${query}` : ''}`;
+        } else if (view === 'stats') {
+          params.set('action', 'by_person');
+          url = `../api/stats.php?${params.toString()}`;
+        } else {
+          return null;
+        }
+
+        const response = await fetch(url, { credentials: 'include' });
+        if (!response.ok) {
+          throw new Error('failed');
+        }
+        const data = await response.json().catch(() => null);
+        if (!data || data.ok === false) {
+          throw new Error('invalid');
+        }
+
+        const teams = Array.isArray(data.teams) ? data.teams : [];
+        const teamId = data.team_id ? Number(data.team_id) : null;
+
+        return { teams, teamId };
+      }
     </script>
   </body>
 </html>
