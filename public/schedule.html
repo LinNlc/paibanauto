@@ -12,9 +12,8 @@
     <script src="./app.js?v=20240605"></script>
     <style>
       :root {
-        --schedule-date-width: 160px;
-        --schedule-week-width: 96px;
-        --schedule-cell-min-width: 96px;
+        --schedule-date-width: 168px;
+        --schedule-emp-width: 110px;
       }
 
       .schedule-card {
@@ -36,9 +35,38 @@
         border-right: 1px solid rgba(148, 163, 184, 0.08);
         border-bottom: 1px solid rgba(148, 163, 184, 0.08);
         padding: 0.5rem 0.75rem;
-        min-width: var(--schedule-cell-min-width);
+        min-width: var(--schedule-emp-width);
         background: rgba(15, 23, 42, 0.75);
         white-space: nowrap;
+        position: relative;
+        box-sizing: border-box;
+      }
+
+      .schedule-table th:not(.sticky-col-1),
+      .schedule-table td:not(.sticky-col-1) {
+        width: var(--schedule-emp-width);
+        max-width: var(--schedule-emp-width);
+      }
+
+      .schedule-table th.sticky-col-1,
+      .schedule-table td.sticky-col-1 {
+        border-right: none;
+        width: var(--schedule-date-width);
+        min-width: var(--schedule-date-width);
+        max-width: var(--schedule-date-width);
+        overflow: hidden;
+      }
+
+      .schedule-table th.sticky-col-1::after,
+      .schedule-table td.sticky-col-1::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: -1px;
+        width: 1px;
+        background: rgba(148, 163, 184, 0.12);
+        pointer-events: none;
       }
 
       .schedule-table th:last-child,
@@ -57,8 +85,7 @@
         color: rgba(226, 232, 240, 0.88);
       }
 
-      .sticky-col-1,
-      .sticky-col-2 {
+      .sticky-col-1 {
         position: sticky;
         z-index: 28;
         background: rgba(30, 41, 59, 0.95) !important;
@@ -71,23 +98,11 @@
         min-width: var(--schedule-date-width);
       }
 
-      .sticky-col-2 {
-        left: calc(var(--schedule-date-width) + 1px);
-        width: var(--schedule-week-width);
-        min-width: var(--schedule-week-width);
-        box-shadow: inset -1px 0 0 rgba(148, 163, 184, 0.08);
-      }
-
-      .schedule-table thead th.sticky-col-2 {
-        box-shadow: inset -1px 0 0 rgba(148, 163, 184, 0.18);
-      }
-
-      .schedule-table tbody td.sticky-col-1,
-      .schedule-table tbody td.sticky-col-2 {
+      .schedule-table tbody td.sticky-col-1 {
         background: rgba(15, 23, 42, 0.96) !important;
       }
 
-      .schedule-table tbody tr:nth-child(even) td:not(.sticky-col-1):not(.sticky-col-2) {
+      .schedule-table tbody tr:nth-child(even) td:not(.sticky-col-1) {
         background: rgba(15, 23, 42, 0.82);
       }
 
@@ -96,14 +111,9 @@
         min-width: var(--schedule-date-width);
       }
 
-      #schedule-colgroup col.schedule-col-week {
-        width: var(--schedule-week-width);
-        min-width: var(--schedule-week-width);
-      }
-
       #schedule-colgroup col.schedule-col-emp {
-        width: var(--schedule-cell-min-width);
-        min-width: var(--schedule-cell-min-width);
+        width: var(--schedule-emp-width);
+        min-width: var(--schedule-emp-width);
       }
 
       .schedule-date-cell {
@@ -115,23 +125,13 @@
       }
 
       .schedule-date-label {
-        font-size: 0.9rem;
+        font-size: 0.92rem;
         font-weight: 600;
       }
 
       .schedule-date-sub {
         font-size: 0.7rem;
         color: rgba(148, 163, 184, 0.65);
-      }
-
-      .schedule-week-cell {
-        text-transform: uppercase;
-        letter-spacing: 0.18em;
-        font-size: 0.7rem;
-        color: rgba(226, 232, 240, 0.75);
-        display: flex;
-        align-items: center;
-        justify-content: center;
       }
 
       .schedule-emp-head {
@@ -141,7 +141,7 @@
         color: rgba(226, 232, 240, 0.9);
       }
 
-      .schedule-emp-head span:last-child {
+      .schedule-emp-sub {
         display: block;
         margin-top: 0.2rem;
         font-size: 0.68rem;
@@ -188,15 +188,15 @@
       }
 
       .shift-mid2 {
-        background: linear-gradient(135deg, rgba(244, 114, 182, 0.18), rgba(236, 72, 153, 0.12));
-        color: #fbcfe8;
-        box-shadow: inset 0 0 0 1px rgba(244, 114, 182, 0.35);
-      }
-
-      .shift-night {
         background: linear-gradient(135deg, rgba(14, 116, 144, 0.22), rgba(6, 78, 59, 0.18));
         color: #99f6e4;
         box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.32);
+      }
+
+      .shift-night {
+        background: linear-gradient(135deg, rgba(244, 114, 182, 0.18), rgba(236, 72, 153, 0.12));
+        color: #fbcfe8;
+        box-shadow: inset 0 0 0 1px rgba(244, 114, 182, 0.35);
       }
 
       .shift-rest {
@@ -336,10 +336,9 @@
               <div class="toolbar-group">
                 <label for="window-size">视图跨度</label>
                 <select id="window-size" class="select-input">
-                  <option value="7">7 天</option>
-                  <option value="14" selected>14 天</option>
-                  <option value="21">21 天</option>
-                  <option value="30">30 天</option>
+                  <option value="31" selected>31 天</option>
+                  <option value="62">62 天</option>
+                  <option value="93">93 天</option>
                 </select>
               </div>
             </div>
@@ -400,7 +399,7 @@
         shiftOptions: [],
         days: [],
         windowStart: 0,
-        windowSize: 14,
+        windowSize: 31,
       };
 
       const CURRENT_VIEW = 'schedule';
@@ -552,7 +551,7 @@
         elements.windowSize.addEventListener('change', () => {
           const size = parseInt(elements.windowSize.value, 10);
           if (Number.isFinite(size) && size > 0) {
-            state.windowSize = Math.min(size, 30);
+            state.windowSize = Math.min(size, 93);
             adjustWindowBounds();
             renderTable();
             updateWindowInfo();
@@ -978,7 +977,7 @@
           days.push({
             date: iso,
             weekday: WEEK_NAMES[cursor.getDay()],
-            label: `${cursor.getMonth() + 1}月${cursor.getDate()}日`,
+            label: iso,
           });
           cursor = addDays(cursor, 1);
         }
@@ -1000,16 +999,12 @@
         adjustWindowBounds();
         const endIndex = Math.min(state.windowStart + state.windowSize, state.days.length);
         const visibleDays = state.days.slice(state.windowStart, endIndex);
-        const expectedColumns = 2 + state.employees.length;
+        const expectedColumns = 1 + state.employees.length;
 
         const colFragment = document.createDocumentFragment();
         const dateCol = document.createElement('col');
         dateCol.className = 'schedule-col-date';
         colFragment.appendChild(dateCol);
-
-        const weekCol = document.createElement('col');
-        weekCol.className = 'schedule-col-week';
-        colFragment.appendChild(weekCol);
 
         state.employees.forEach(() => {
           const empCol = document.createElement('col');
@@ -1033,25 +1028,19 @@
         dateTh.textContent = '日期';
         headRow.appendChild(dateTh);
 
-        const weekTh = document.createElement('th');
-        weekTh.className = 'sticky-col-2 text-left text-xs tracking-[0.3em] text-slate-400';
-        weekTh.textContent = '星期';
-        headRow.appendChild(weekTh);
-
         state.employees.forEach((emp) => {
           const th = document.createElement('th');
           th.dataset.empId = String(emp.id);
           th.className = 'schedule-emp-head';
           const nameLine = document.createElement('span');
           nameLine.textContent = emp.display_name || emp.name || `成员#${emp.id}`;
-          const subLine = document.createElement('span');
-          if (emp.display_name && emp.name && emp.display_name !== emp.name) {
-            subLine.textContent = emp.name;
-          } else {
-            subLine.textContent = `ID: ${emp.id}`;
-          }
           th.appendChild(nameLine);
-          th.appendChild(subLine);
+          if (emp.display_name && emp.name && emp.display_name !== emp.name) {
+            const aliasLine = document.createElement('span');
+            aliasLine.className = 'schedule-emp-sub';
+            aliasLine.textContent = emp.name;
+            th.appendChild(aliasLine);
+          }
           if (!emp.active) {
             th.classList.add('opacity-60');
             th.title = '已停用';
@@ -1082,19 +1071,14 @@
           dateWrap.className = 'schedule-date-cell';
           const dateLabel = document.createElement('span');
           dateLabel.className = 'schedule-date-label';
-          dateLabel.textContent = day.label;
+          dateLabel.textContent = day.date;
           const dateSub = document.createElement('span');
           dateSub.className = 'schedule-date-sub';
-          dateSub.textContent = day.date;
+          dateSub.textContent = `星期${day.weekday}`;
           dateWrap.appendChild(dateLabel);
           dateWrap.appendChild(dateSub);
           dateTd.appendChild(dateWrap);
           tr.appendChild(dateTd);
-
-          const weekTd = document.createElement('td');
-          weekTd.className = 'sticky-col-2 schedule-week-cell';
-          weekTd.textContent = `周${day.weekday}`;
-          tr.appendChild(weekTd);
 
           state.employees.forEach((emp) => {
             const td = document.createElement('td');
@@ -1167,9 +1151,9 @@
 
       function adjustWindowBounds() {
         if (state.windowSize <= 0 || !Number.isFinite(state.windowSize)) {
-          state.windowSize = parseInt(elements.windowSize.value, 10) || 14;
+          state.windowSize = parseInt(elements.windowSize.value, 10) || 31;
         }
-        state.windowSize = Math.min(Math.max(state.windowSize, 1), 30);
+        state.windowSize = Math.min(Math.max(state.windowSize, 1), 93);
         if (state.windowStart + state.windowSize > state.days.length) {
           state.windowStart = Math.max(0, state.days.length - state.windowSize);
         }
@@ -1459,9 +1443,9 @@
           case '中1':
             return 'linear-gradient(135deg, rgba(129,140,248,0.4), rgba(14,116,144,0.35))';
           case '中2':
-            return 'linear-gradient(135deg, rgba(244,114,182,0.45), rgba(236,72,153,0.35))';
-          case '夜':
             return 'linear-gradient(135deg, rgba(14,116,144,0.4), rgba(6,78,59,0.35))';
+          case '夜':
+            return 'linear-gradient(135deg, rgba(244,114,182,0.45), rgba(236,72,153,0.35))';
           case '休息':
             return 'linear-gradient(135deg, rgba(34,197,94,0.45), rgba(74,222,128,0.35))';
           default:
