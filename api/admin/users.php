@@ -23,7 +23,7 @@ switch (strtoupper($method)) {
 function handle_list_users(): void
 {
     $pdo = db();
-    $stmt = $pdo->query('SELECT id, username, display_name, role, allowed_teams_json, allowed_views_json, editable_teams_json, disabled, created_at FROM users ORDER BY id ASC');
+    $stmt = $pdo->query('SELECT id, username, display_name, role, allowed_teams_json, allowed_views_json, editable_teams_json, features_json, disabled, created_at FROM users ORDER BY id ASC');
     $users = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $users[] = format_user_row($row);
@@ -74,12 +74,14 @@ function handle_create_user(array $payload): void
     $editableTeams = normalize_team_ids($payload['editable_teams'] ?? []);
     $allowedViews = normalize_views($payload['allowed_views'] ?? []);
     $allowedViews = adjust_allowed_views_by_role($role, $allowedViews);
+    $features = normalize_features($payload['features'] ?? null);
+    $features = adjust_features_by_role($role, $features);
     $disabled = normalize_bool($payload['disabled'] ?? false);
 
     $pdo = db();
 
     try {
-        $stmt = $pdo->prepare('INSERT INTO users (username, display_name, password_hash, role, allowed_teams_json, allowed_views_json, editable_teams_json, disabled) VALUES (:username, :display_name, :password_hash, :role, :allowed_teams, :allowed_views, :editable_teams, :disabled)');
+        $stmt = $pdo->prepare('INSERT INTO users (username, display_name, password_hash, role, allowed_teams_json, allowed_views_json, editable_teams_json, features_json, disabled) VALUES (:username, :display_name, :password_hash, :role, :allowed_teams, :allowed_views, :editable_teams, :features, :disabled)');
         $stmt->execute([
             ':username' => $username,
             ':display_name' => $displayName,
@@ -88,6 +90,7 @@ function handle_create_user(array $payload): void
             ':allowed_teams' => encode_json_field($allowedTeams),
             ':allowed_views' => encode_json_field($allowedViews),
             ':editable_teams' => encode_json_field($editableTeams),
+            ':features' => encode_json_field($features),
             ':disabled' => $disabled ? 1 : 0,
         ]);
     } catch (PDOException $e) {
@@ -170,6 +173,17 @@ function handle_update_user(array $payload): void
         $params[':allowed_views'] = encode_json_field($adjustedViews);
     }
 
+    if (array_key_exists('features', $payload)) {
+        $features = normalize_features($payload['features']);
+        $features = adjust_features_by_role($targetRole, $features);
+        $fields[] = 'features_json = :features';
+        $params[':features'] = encode_json_field($features);
+    } elseif ($targetRole !== $existingRole) {
+        $adjustedFeatures = adjust_features_by_role($targetRole, $existingUser['features'] ?? []);
+        $fields[] = 'features_json = :features';
+        $params[':features'] = encode_json_field($adjustedFeatures);
+    }
+
     if (array_key_exists('disabled', $payload)) {
         $disabled = normalize_bool($payload['disabled']);
         $fields[] = 'disabled = :disabled';
@@ -245,7 +259,7 @@ function handle_reset_password(array $payload): void
 function fetch_user_by_id(int $id): array
 {
     $pdo = db();
-    $stmt = $pdo->prepare('SELECT id, username, display_name, role, allowed_teams_json, allowed_views_json, editable_teams_json, disabled, created_at FROM users WHERE id = :id LIMIT 1');
+    $stmt = $pdo->prepare('SELECT id, username, display_name, role, allowed_teams_json, allowed_views_json, editable_teams_json, features_json, disabled, created_at FROM users WHERE id = :id LIMIT 1');
     $stmt->execute([':id' => $id]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
@@ -262,6 +276,8 @@ function format_user_row(array $row): array
     $allowedViews = normalize_views(decode_json_field($row['allowed_views_json'] ?? '[]', []));
     $role = (string) $row['role'];
     $allowedViews = adjust_allowed_views_by_role($role, $allowedViews);
+    $features = normalize_features(decode_json_field($row['features_json'] ?? '{}', []));
+    $features = adjust_features_by_role($role, $features);
 
     return [
         'id' => (int) $row['id'],
@@ -271,6 +287,7 @@ function format_user_row(array $row): array
         'allowed_teams' => $allowedTeams,
         'editable_teams' => $editableTeams,
         'allowed_views' => $allowedViews,
+        'features' => $features,
         'disabled' => ((int) $row['disabled']) === 1,
         'created_at' => (string) $row['created_at'],
     ];
@@ -334,6 +351,39 @@ function adjust_allowed_views_by_role(string $role, array $views): array
     }
 
     return array_values($unique);
+}
+
+function normalize_features($value): array
+{
+    $defaults = [
+        'scheduleFloatingBall' => false,
+        'scheduleImportExport' => false,
+        'scheduleAssistSettings' => false,
+        'scheduleAi' => false,
+    ];
+
+    if (!is_array($value)) {
+        return $defaults;
+    }
+
+    foreach ($defaults as $key => $fallback) {
+        $raw = $value[$key] ?? $fallback;
+        $defaults[$key] = is_bool($raw) ? $raw : (bool) $raw;
+    }
+
+    return $defaults;
+}
+
+function adjust_features_by_role(string $role, array $features): array
+{
+    $normalized = normalize_features($features);
+    if (strtolower($role) === 'admin') {
+        foreach ($normalized as $key => $value) {
+            $normalized[$key] = true;
+        }
+    }
+
+    return $normalized;
 }
 
 function normalize_bool($value): bool

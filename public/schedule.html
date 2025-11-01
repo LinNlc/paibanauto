@@ -239,6 +239,319 @@
       .shadow-inner-subtle {
         box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.12);
       }
+
+      .floating-ball {
+        position: fixed;
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 30% 30%, rgba(56, 189, 248, 0.8), rgba(59, 130, 246, 0.9));
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #e0f2fe;
+        cursor: pointer;
+        z-index: 60;
+        user-select: none;
+        transition: transform 0.2s ease;
+      }
+
+      .floating-ball:hover {
+        transform: scale(1.05);
+      }
+
+      .floating-ball-menu {
+        position: fixed;
+        min-width: 220px;
+        background: rgba(15, 23, 42, 0.96);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 1rem;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.55);
+        padding: 0.75rem;
+        z-index: 59;
+        display: none;
+      }
+
+      .floating-ball-menu.active {
+        display: block;
+      }
+
+      .floating-ball-menu button {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.6rem 0.75rem;
+        border-radius: 0.75rem;
+        background: transparent;
+        color: rgba(226, 232, 240, 0.92);
+        font-size: 0.9rem;
+        transition: background 0.15s ease;
+      }
+
+      .floating-ball-menu button:hover:not([disabled]) {
+        background: rgba(56, 189, 248, 0.15);
+      }
+
+      .floating-ball-menu button[disabled] {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.7);
+        backdrop-filter: blur(6px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 58;
+        padding: 1.5rem;
+      }
+
+      .modal-backdrop.active {
+        display: flex;
+      }
+
+      .modal-panel {
+        width: min(720px, 100%);
+        max-height: 85vh;
+        overflow-y: auto;
+        background: rgba(15, 23, 42, 0.98);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 1.25rem;
+        padding: 1.5rem;
+        color: #e2e8f0;
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.55);
+      }
+
+      .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+      }
+
+      .modal-section {
+        margin-bottom: 1.5rem;
+      }
+
+      .modal-section h3 {
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+      }
+
+      .modal-close {
+        border: none;
+        background: transparent;
+        color: rgba(148, 163, 184, 0.8);
+        cursor: pointer;
+        font-size: 1.2rem;
+      }
+
+      .shift-variant-amber.shift-white,
+      .shift-white.shift-variant-amber {
+        background: linear-gradient(135deg, rgba(251, 191, 36, 0.18), rgba(245, 158, 11, 0.14));
+        color: #fde68a;
+        box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.35);
+      }
+
+      .shift-variant-emerald.shift-white,
+      .shift-white.shift-variant-emerald {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(5, 150, 105, 0.14));
+        color: #bbf7d0;
+        box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.35);
+      }
+
+      .shift-variant-slate.shift-white,
+      .shift-white.shift-variant-slate {
+        background: linear-gradient(135deg, rgba(148, 163, 184, 0.18), rgba(100, 116, 139, 0.14));
+        color: #f1f5f9;
+        box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.4);
+      }
+
+      .shift-variant-violet.shift-mid1,
+      .shift-mid1.shift-variant-violet {
+        background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(124, 58, 237, 0.15));
+        color: #e9d5ff;
+        box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.35);
+      }
+
+      .shift-variant-amber.shift-mid1,
+      .shift-mid1.shift-variant-amber {
+        background: linear-gradient(135deg, rgba(253, 186, 116, 0.18), rgba(251, 146, 60, 0.14));
+        color: #fed7aa;
+        box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.35);
+      }
+
+      .shift-variant-slate.shift-mid1,
+      .shift-mid1.shift-variant-slate {
+        background: linear-gradient(135deg, rgba(148, 163, 184, 0.18), rgba(71, 85, 105, 0.16));
+        color: #e2e8f0;
+        box-shadow: inset 0 0 0 1px rgba(71, 85, 105, 0.4);
+      }
+
+      .shift-variant-emerald.shift-mid2,
+      .shift-mid2.shift-variant-emerald {
+        background: linear-gradient(135deg, rgba(52, 211, 153, 0.2), rgba(22, 163, 74, 0.16));
+        color: #bbf7d0;
+        box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.32);
+      }
+
+      .shift-variant-cyan.shift-mid2,
+      .shift-mid2.shift-variant-cyan {
+        background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(6, 182, 212, 0.14));
+        color: #a5f3fc;
+        box-shadow: inset 0 0 0 1px rgba(6, 182, 212, 0.32);
+      }
+
+      .shift-variant-slate.shift-mid2,
+      .shift-mid2.shift-variant-slate {
+        background: linear-gradient(135deg, rgba(148, 163, 184, 0.18), rgba(71, 85, 105, 0.14));
+        color: #e2e8f0;
+        box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.35);
+      }
+
+      .shift-variant-violet.shift-night,
+      .shift-night.shift-variant-violet {
+        background: linear-gradient(135deg, rgba(192, 132, 252, 0.18), rgba(126, 34, 206, 0.16));
+        color: #f5d0fe;
+        box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.38);
+      }
+
+      .shift-variant-amber.shift-night,
+      .shift-night.shift-variant-amber {
+        background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.16));
+        color: #fde68a;
+        box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.35);
+      }
+
+      .shift-variant-slate.shift-night,
+      .shift-night.shift-variant-slate {
+        background: linear-gradient(135deg, rgba(148, 163, 184, 0.2), rgba(71, 85, 105, 0.16));
+        color: #e2e8f0;
+        box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.4);
+      }
+
+      .date-summary {
+        margin-top: 0.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+      }
+
+      .summary-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.7rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 9999px;
+        background: rgba(30, 41, 59, 0.75);
+        border: 1px solid rgba(100, 116, 139, 0.35);
+        color: rgba(226, 232, 240, 0.85);
+      }
+
+      .summary-chip[data-state='high'] {
+        font-weight: 600;
+      }
+
+      .summary-chip[data-state='low'] {
+        font-weight: 600;
+      }
+
+      .summary-chip-emerald[data-state='high'] {
+        background: rgba(16, 185, 129, 0.18);
+        border-color: rgba(16, 185, 129, 0.35);
+        color: #bbf7d0;
+      }
+
+      .summary-chip-emerald[data-state='low'] {
+        background: rgba(16, 185, 129, 0.12);
+        border-color: rgba(16, 185, 129, 0.25);
+        color: #6ee7b7;
+      }
+
+      .summary-chip-sky[data-state='high'],
+      .summary-chip-sky[data-state='low'] {
+        background: rgba(56, 189, 248, 0.15);
+        border-color: rgba(56, 189, 248, 0.35);
+        color: #bae6fd;
+      }
+
+      .summary-chip-amber[data-state='high'],
+      .summary-chip-amber[data-state='low'] {
+        background: rgba(251, 191, 36, 0.18);
+        border-color: rgba(245, 158, 11, 0.3);
+        color: #fde68a;
+      }
+
+      .summary-chip-rose[data-state='high'],
+      .summary-chip-rose[data-state='low'] {
+        background: rgba(244, 114, 182, 0.18);
+        border-color: rgba(244, 63, 94, 0.3);
+        color: #fecdd3;
+      }
+
+      .summary-chip-slate[data-state='high'],
+      .summary-chip-slate[data-state='low'] {
+        background: rgba(100, 116, 139, 0.2);
+        border-color: rgba(148, 163, 184, 0.35);
+        color: #f8fafc;
+      }
+
+      .schedule-emp-head {
+        position: relative;
+      }
+
+      .assist-tooltip {
+        position: fixed;
+        pointer-events: none;
+        background: rgba(15, 23, 42, 0.96);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 0.75rem;
+        padding: 0.75rem 1rem;
+        font-size: 0.75rem;
+        color: #e2e8f0;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.45);
+        z-index: 80;
+        min-width: 220px;
+      }
+
+      .assist-tooltip h4 {
+        font-size: 0.8rem;
+        margin-bottom: 0.5rem;
+        color: rgba(226, 232, 240, 0.9);
+      }
+
+      .assist-tooltip table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .assist-tooltip th,
+      .assist-tooltip td {
+        text-align: right;
+        padding: 0.1rem 0.35rem;
+      }
+
+      .assist-tooltip th {
+        font-weight: 500;
+        color: rgba(148, 163, 184, 0.85);
+      }
+
+      .assist-tooltip td {
+        color: rgba(226, 232, 240, 0.95);
+      }
     </style>
   </head>
   <body>
@@ -353,8 +666,370 @@
 
     <div id="shift-popover" class="hidden fixed z-50"></div>
 
+    <div id="schedule-fab" class="floating-ball hidden" aria-label="排班辅助工具" role="button">
+      <span>工具</span>
+    </div>
+    <div id="schedule-fab-menu" class="floating-ball-menu hidden" role="menu">
+      <button type="button" id="fab-import-btn" data-feature="import" role="menuitem">
+        <span>班表导入 / 导出</span>
+        <span aria-hidden="true">↧</span>
+      </button>
+      <button type="button" id="fab-ai-btn" data-feature="ai" role="menuitem">
+        <span>AI 排班</span>
+        <span aria-hidden="true">☆</span>
+      </button>
+      <button type="button" id="fab-assist-btn" data-feature="assist" role="menuitem">
+        <span>辅助功能设置</span>
+        <span aria-hidden="true">⚙︎</span>
+      </button>
+    </div>
+
+    <div id="fab-modal-backdrop" class="modal-backdrop hidden" aria-hidden="true">
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="fab-modal-title">
+        <div class="modal-header">
+          <h2 id="fab-modal-title" class="text-lg font-semibold">班表导入 / 导出</h2>
+          <button type="button" class="modal-close" data-modal-close aria-label="关闭">×</button>
+        </div>
+        <div class="modal-section">
+          <p class="text-sm text-slate-400 mb-3">
+            在此可以一键下载模板、导出当前日期范围的排班表，并支持使用模板批量导入排班数据。
+          </p>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label class="block text-xs uppercase tracking-[0.2em] text-slate-500">导出起始日期</label>
+              <input id="fab-export-start" type="date" class="select-input mt-2" />
+            </div>
+            <div>
+              <label class="block text-xs uppercase tracking-[0.2em] text-slate-500">导出结束日期</label>
+              <input id="fab-export-end" type="date" class="select-input mt-2" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-section space-y-3">
+          <button type="button" id="fab-template-btn" class="btn-secondary w-full">下载模板</button>
+          <button type="button" id="fab-export-btn" class="btn-primary w-full">导出 Excel</button>
+          <div class="border border-dashed border-slate-700/70 rounded-xl p-4 space-y-3">
+            <div>
+              <label for="fab-import-file" class="block text-sm font-medium">导入排班文件</label>
+              <input id="fab-import-file" type="file" accept=".xlsx" class="mt-2 block w-full text-sm" />
+            </div>
+            <button type="button" id="fab-import-submit" class="btn-primary w-full">开始导入</button>
+            <p id="fab-import-status" class="text-xs text-slate-400"></p>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" data-modal-close>关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="assist-modal-backdrop" class="modal-backdrop hidden" aria-hidden="true">
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="assist-modal-title">
+        <div class="modal-header">
+          <h2 id="assist-modal-title" class="text-lg font-semibold">排班辅助功能设置</h2>
+          <button type="button" class="modal-close" data-modal-close aria-label="关闭">×</button>
+        </div>
+        <div class="modal-section text-sm text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+          <p>提示：该团队的辅助设置会同步给所有拥有浏览权限的账号，请谨慎调整。</p>
+        </div>
+        <div class="modal-section space-y-3">
+          <h3 class="text-base font-semibold">班次颜色</h3>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="flex flex-col gap-2 text-sm">
+              <span>白班颜色</span>
+              <select id="assist-color-white" class="select-input"></select>
+            </label>
+            <label class="flex flex-col gap-2 text-sm">
+              <span>中班1颜色</span>
+              <select id="assist-color-mid1" class="select-input"></select>
+            </label>
+            <label class="flex flex-col gap-2 text-sm">
+              <span>中班2颜色</span>
+              <select id="assist-color-mid2" class="select-input"></select>
+            </label>
+            <label class="flex flex-col gap-2 text-sm">
+              <span>夜班颜色</span>
+              <select id="assist-color-night" class="select-input"></select>
+            </label>
+          </div>
+        </div>
+        <div class="modal-section space-y-3">
+          <h3 class="text-base font-semibold">悬浮信息</h3>
+          <label class="flex items-center gap-2 text-sm">
+            <input id="assist-hover-annual" type="checkbox" class="w-4 h-4 rounded border-slate-600 bg-slate-900" />
+            <span>显示年度班次统计</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm">
+            <input id="assist-hover-quarter" type="checkbox" class="w-4 h-4 rounded border-slate-600 bg-slate-900" />
+            <span>显示季度班次统计</span>
+          </label>
+        </div>
+        <div class="modal-section space-y-4">
+          <div class="flex items-center gap-2">
+            <input id="assist-summary-enabled" type="checkbox" class="w-4 h-4 rounded border-slate-600 bg-slate-900" />
+            <span class="text-base font-semibold">日期汇总显示</span>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="flex items-center gap-2 text-sm">
+              <input id="assist-summary-total" type="checkbox" class="w-4 h-4 rounded border-slate-600 bg-slate-900" />
+              <span>显示总人数</span>
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input id="assist-summary-white" type="checkbox" class="w-4 h-4 rounded border-slate-600 bg-slate-900" />
+              <span>显示白班人数</span>
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input id="assist-summary-mid1" type="checkbox" class="w-4 h-4 rounded border-slate-600 bg-slate-900" />
+              <span>显示中班1人数</span>
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input id="assist-summary-mid2" type="checkbox" class="w-4 h-4 rounded border-slate-600 bg-slate-900" />
+              <span>显示中班2人数</span>
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input id="assist-summary-night" type="checkbox" class="w-4 h-4 rounded border-slate-600 bg-slate-900" />
+              <span>显示夜班人数</span>
+            </label>
+          </div>
+          <div class="space-y-3">
+            <div class="text-xs text-slate-400">为不同指标设置高/低阈值及高亮颜色（留空表示不启用阈值）。</div>
+            <div class="grid gap-3">
+              <div class="grid gap-3 sm:grid-cols-2" data-metric="total">
+                <div class="rounded-xl border border-slate-800/80 p-3 space-y-2">
+                  <div class="text-sm font-medium">总人数阈值</div>
+                  <label class="flex items-center gap-2 text-xs">
+                    <span class="w-14 text-slate-400">高于</span>
+                    <input id="assist-threshold-total-high" type="number" min="0" class="flex-1 rounded border border-slate-700 bg-slate-900 px-2 py-1" />
+                    <select id="assist-threshold-total-high-color" class="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs"></select>
+                  </label>
+                  <label class="flex items-center gap-2 text-xs">
+                    <span class="w-14 text-slate-400">低于</span>
+                    <input id="assist-threshold-total-low" type="number" min="0" class="flex-1 rounded border border-slate-700 bg-slate-900 px-2 py-1" />
+                    <select id="assist-threshold-total-low-color" class="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs"></select>
+                  </label>
+                </div>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2" data-metric="white">
+                <div class="rounded-xl border border-slate-800/80 p-3 space-y-2">
+                  <div class="text-sm font-medium">白班人数阈值</div>
+                  <label class="flex items-center gap-2 text-xs">
+                    <span class="w-14 text-slate-400">高于</span>
+                    <input id="assist-threshold-white-high" type="number" min="0" class="flex-1 rounded border border-slate-700 bg-slate-900 px-2 py-1" />
+                    <select id="assist-threshold-white-high-color" class="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs"></select>
+                  </label>
+                  <label class="flex items-center gap-2 text-xs">
+                    <span class="w-14 text-slate-400">低于</span>
+                    <input id="assist-threshold-white-low" type="number" min="0" class="flex-1 rounded border border-slate-700 bg-slate-900 px-2 py-1" />
+                    <select id="assist-threshold-white-low-color" class="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs"></select>
+                  </label>
+                </div>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2" data-metric="mid1">
+                <div class="rounded-xl border border-slate-800/80 p-3 space-y-2">
+                  <div class="text-sm font-medium">中班1人数阈值</div>
+                  <label class="flex items-center gap-2 text-xs">
+                    <span class="w-14 text-slate-400">高于</span>
+                    <input id="assist-threshold-mid1-high" type="number" min="0" class="flex-1 rounded border border-slate-700 bg-slate-900 px-2 py-1" />
+                    <select id="assist-threshold-mid1-high-color" class="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs"></select>
+                  </label>
+                  <label class="flex items-center gap-2 text-xs">
+                    <span class="w-14 text-slate-400">低于</span>
+                    <input id="assist-threshold-mid1-low" type="number" min="0" class="flex-1 rounded border border-slate-700 bg-slate-900 px-2 py-1" />
+                    <select id="assist-threshold-mid1-low-color" class="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs"></select>
+                  </label>
+                </div>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2" data-metric="mid2">
+                <div class="rounded-xl border border-slate-800/80 p-3 space-y-2">
+                  <div class="text-sm font-medium">中班2人数阈值</div>
+                  <label class="flex items-center gap-2 text-xs">
+                    <span class="w-14 text-slate-400">高于</span>
+                    <input id="assist-threshold-mid2-high" type="number" min="0" class="flex-1 rounded border border-slate-700 bg-slate-900 px-2 py-1" />
+                    <select id="assist-threshold-mid2-high-color" class="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs"></select>
+                  </label>
+                  <label class="flex items-center gap-2 text-xs">
+                    <span class="w-14 text-slate-400">低于</span>
+                    <input id="assist-threshold-mid2-low" type="number" min="0" class="flex-1 rounded border border-slate-700 bg-slate-900 px-2 py-1" />
+                    <select id="assist-threshold-mid2-low-color" class="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs"></select>
+                  </label>
+                </div>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2" data-metric="night">
+                <div class="rounded-xl border border-slate-800/80 p-3 space-y-2">
+                  <div class="text-sm font-medium">夜班人数阈值</div>
+                  <label class="flex items-center gap-2 text-xs">
+                    <span class="w-14 text-slate-400">高于</span>
+                    <input id="assist-threshold-night-high" type="number" min="0" class="flex-1 rounded border border-slate-700 bg-slate-900 px-2 py-1" />
+                    <select id="assist-threshold-night-high-color" class="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs"></select>
+                  </label>
+                  <label class="flex items-center gap-2 text-xs">
+                    <span class="w-14 text-slate-400">低于</span>
+                    <input id="assist-threshold-night-low" type="number" min="0" class="flex-1 rounded border border-slate-700 bg-slate-900 px-2 py-1" />
+                    <select id="assist-threshold-night-low-color" class="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs"></select>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" data-modal-close>取消</button>
+          <button type="button" id="assist-settings-save" class="btn-primary">保存设置</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="assist-tooltip" class="assist-tooltip hidden" role="presentation"></div>
+
     <script>
       const WEEK_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
+      const SHIFT_VARIANT_KEYS = {
+        白: 'white',
+        中1: 'mid1',
+        中2: 'mid2',
+        夜: 'night',
+      };
+      const SHIFT_VARIANT_STYLES = {
+        white: {
+          sky: 'linear-gradient(135deg, rgba(56,189,248,0.18), rgba(59,130,246,0.14))',
+          amber: 'linear-gradient(135deg, rgba(251,191,36,0.18), rgba(245,158,11,0.14))',
+          emerald: 'linear-gradient(135deg, rgba(16,185,129,0.18), rgba(5,150,105,0.14))',
+          slate: 'linear-gradient(135deg, rgba(148,163,184,0.18), rgba(100,116,139,0.14))',
+        },
+        mid1: {
+          indigo: 'linear-gradient(135deg, rgba(129,140,248,0.18), rgba(14,116,144,0.18))',
+          violet: 'linear-gradient(135deg, rgba(168,85,247,0.2), rgba(124,58,237,0.15))',
+          amber: 'linear-gradient(135deg, rgba(253,186,116,0.18), rgba(251,146,60,0.14))',
+          slate: 'linear-gradient(135deg, rgba(148,163,184,0.18), rgba(71,85,105,0.16))',
+        },
+        mid2: {
+          teal: 'linear-gradient(135deg, rgba(14,116,144,0.22), rgba(6,78,59,0.18))',
+          emerald: 'linear-gradient(135deg, rgba(52,211,153,0.2), rgba(22,163,74,0.16))',
+          cyan: 'linear-gradient(135deg, rgba(34,211,238,0.18), rgba(6,182,212,0.14))',
+          slate: 'linear-gradient(135deg, rgba(148,163,184,0.18), rgba(71,85,105,0.14))',
+        },
+        night: {
+          rose: 'linear-gradient(135deg, rgba(244,114,182,0.18), rgba(236,72,153,0.12))',
+          violet: 'linear-gradient(135deg, rgba(192,132,252,0.18), rgba(126,34,206,0.16))',
+          amber: 'linear-gradient(135deg, rgba(251,191,36,0.2), rgba(245,158,11,0.16))',
+          slate: 'linear-gradient(135deg, rgba(148,163,184,0.2), rgba(71,85,105,0.16))',
+        },
+      };
+      const SHIFT_COLOR_OPTIONS = {
+        white: [
+          { value: 'sky', label: '霜蓝（默认）' },
+          { value: 'amber', label: '暖金' },
+          { value: 'emerald', label: '薄荷绿' },
+          { value: 'slate', label: '冷灰' },
+        ],
+        mid1: [
+          { value: 'indigo', label: '靛蓝（默认）' },
+          { value: 'violet', label: '暮紫' },
+          { value: 'amber', label: '暖金' },
+          { value: 'slate', label: '冷灰' },
+        ],
+        mid2: [
+          { value: 'teal', label: '青翠（默认）' },
+          { value: 'emerald', label: '草绿' },
+          { value: 'cyan', label: '碧蓝' },
+          { value: 'slate', label: '冷灰' },
+        ],
+        night: [
+          { value: 'rose', label: '玫红（默认）' },
+          { value: 'violet', label: '暮紫' },
+          { value: 'amber', label: '暖金' },
+          { value: 'slate', label: '冷灰' },
+        ],
+      };
+      const SUMMARY_COLOR_OPTIONS = [
+        { value: 'emerald', label: '翠绿' },
+        { value: 'sky', label: '天空蓝' },
+        { value: 'amber', label: '琥珀黄' },
+        { value: 'rose', label: '玫红' },
+        { value: 'slate', label: '冷灰' },
+      ];
+      const FAB_FEATURE_KEYS = {
+        import: 'scheduleImportExport',
+        ai: 'scheduleAi',
+        assist: 'scheduleAssistSettings',
+      };
+      const FAB_POSITION_STORAGE_KEY = 'paiban:schedule-fab-position';
+      const FAB_MIN_MARGIN = 16;
+      const ASSIST_METRICS = ['total', 'white', 'mid1', 'mid2', 'night'];
+      const ASSIST_THRESHOLD_CONTROL_MAP = {
+        total: {
+          highValue: 'assistThresholdTotalHigh',
+          highColor: 'assistThresholdTotalHighColor',
+          lowValue: 'assistThresholdTotalLow',
+          lowColor: 'assistThresholdTotalLowColor',
+        },
+        white: {
+          highValue: 'assistThresholdWhiteHigh',
+          highColor: 'assistThresholdWhiteHighColor',
+          lowValue: 'assistThresholdWhiteLow',
+          lowColor: 'assistThresholdWhiteLowColor',
+        },
+        mid1: {
+          highValue: 'assistThresholdMid1High',
+          highColor: 'assistThresholdMid1HighColor',
+          lowValue: 'assistThresholdMid1Low',
+          lowColor: 'assistThresholdMid1LowColor',
+        },
+        mid2: {
+          highValue: 'assistThresholdMid2High',
+          highColor: 'assistThresholdMid2HighColor',
+          lowValue: 'assistThresholdMid2Low',
+          lowColor: 'assistThresholdMid2LowColor',
+        },
+        night: {
+          highValue: 'assistThresholdNightHigh',
+          highColor: 'assistThresholdNightHighColor',
+          lowValue: 'assistThresholdNightLow',
+          lowColor: 'assistThresholdNightLowColor',
+        },
+      };
+      const DEFAULT_ASSIST_SETTINGS = {
+        shiftColors: {
+          white: 'sky',
+          mid1: 'indigo',
+          mid2: 'teal',
+          night: 'rose',
+        },
+        hover: {
+          showAnnual: true,
+          showQuarterly: true,
+        },
+        dailySummary: {
+          enabled: true,
+          showTotal: true,
+          showWhite: true,
+          showMid1: true,
+          showMid2: true,
+          showNight: true,
+          thresholds: {
+            total: {
+              high: { value: null, color: 'emerald' },
+              low: { value: null, color: 'rose' },
+            },
+            white: {
+              high: { value: null, color: 'emerald' },
+              low: { value: null, color: 'rose' },
+            },
+            mid1: {
+              high: { value: null, color: 'emerald' },
+              low: { value: null, color: 'rose' },
+            },
+            mid2: {
+              high: { value: null, color: 'emerald' },
+              low: { value: null, color: 'rose' },
+            },
+            night: {
+              high: { value: null, color: 'emerald' },
+              low: { value: null, color: 'rose' },
+            },
+          },
+        },
+      };
       const SHIFT_STYLE = new Map([
         ['白', 'shift-white'],
         ['中1', 'shift-mid1'],
@@ -376,7 +1051,14 @@
         days: [],
         windowStart: 0,
         windowSize: 31,
+        assist: JSON.parse(JSON.stringify(DEFAULT_ASSIST_SETTINGS)),
+        dailySummary: new Map(),
+        assistStats: new Map(),
+        featureFlags: {},
       };
+
+      let assistStatsLoading = false;
+      let assistStatsYear = null;
 
       const CURRENT_VIEW = 'schedule';
 
@@ -390,6 +1072,86 @@
           return [];
         }
         return list.map((item) => String(item).toLowerCase());
+      }
+
+      function cloneAssistSettings(settings = DEFAULT_ASSIST_SETTINGS) {
+        return JSON.parse(JSON.stringify(settings));
+      }
+
+      function normalizeAssistSettings(value) {
+        const normalized = cloneAssistSettings();
+        if (!value || typeof value !== 'object') {
+          return normalized;
+        }
+
+        if (value.shiftColors && typeof value.shiftColors === 'object') {
+          Object.entries(SHIFT_COLOR_OPTIONS).forEach(([key, options]) => {
+            const candidate = String(value.shiftColors[key] || '').toLowerCase();
+            const allowed = options.map((item) => item.value);
+            if (allowed.includes(candidate)) {
+              normalized.shiftColors[key] = candidate;
+            }
+          });
+        }
+
+        if (value.hover && typeof value.hover === 'object') {
+          normalized.hover.showAnnual = Boolean(value.hover.showAnnual);
+          normalized.hover.showQuarterly = Boolean(value.hover.showQuarterly);
+        }
+
+        if (value.dailySummary && typeof value.dailySummary === 'object') {
+          const summary = value.dailySummary;
+          normalized.dailySummary.enabled = Boolean(summary.enabled);
+          normalized.dailySummary.showTotal = Boolean(summary.showTotal);
+          normalized.dailySummary.showWhite = Boolean(summary.showWhite);
+          normalized.dailySummary.showMid1 = Boolean(summary.showMid1);
+          normalized.dailySummary.showMid2 = Boolean(summary.showMid2);
+          normalized.dailySummary.showNight = Boolean(summary.showNight);
+
+          if (summary.thresholds && typeof summary.thresholds === 'object') {
+            ASSIST_METRICS.forEach((metric) => {
+              const source = summary.thresholds[metric];
+              if (!source || typeof source !== 'object') {
+                return;
+              }
+              const target = normalized.dailySummary.thresholds[metric];
+              if (source.high && typeof source.high === 'object') {
+                const highValue = Number.parseInt(source.high.value, 10);
+                target.high.value = Number.isFinite(highValue) && highValue >= 0 ? highValue : null;
+                const highColor = String(source.high.color || '').toLowerCase();
+                if (SUMMARY_COLOR_OPTIONS.some((item) => item.value === highColor)) {
+                  target.high.color = highColor;
+                }
+              }
+              if (source.low && typeof source.low === 'object') {
+                const lowValue = Number.parseInt(source.low.value, 10);
+                target.low.value = Number.isFinite(lowValue) && lowValue >= 0 ? lowValue : null;
+                const lowColor = String(source.low.color || '').toLowerCase();
+                if (SUMMARY_COLOR_OPTIONS.some((item) => item.value === lowColor)) {
+                  target.low.color = lowColor;
+                }
+              }
+            });
+          }
+        }
+
+        return normalized;
+      }
+
+      function normalizeFeatureFlags(features) {
+        if (!features || typeof features !== 'object') {
+          return {};
+        }
+        return {
+          scheduleFloatingBall: Boolean(features.scheduleFloatingBall),
+          scheduleImportExport: Boolean(features.scheduleImportExport),
+          scheduleAssistSettings: Boolean(features.scheduleAssistSettings),
+          scheduleAi: Boolean(features.scheduleAi),
+        };
+      }
+
+      function hasFeature(key) {
+        return Boolean(state.featureFlags && state.featureFlags[key]);
       }
 
       function userCanAccessView(user, view) {
@@ -428,6 +1190,12 @@
       let sseReconnectTimer = null;
       let currentSseKey = '';
       let scheduledColumnLock = 0;
+      let fabPosition = null;
+      let fabMenuVisible = false;
+      let fabPointerActive = false;
+      let fabPointerId = null;
+      let fabDragOffset = { x: 0, y: 0 };
+      let fabDragMoved = false;
 
       const elements = {
         teamName: document.getElementById('team-name'),
@@ -450,6 +1218,54 @@
         windowForward: document.getElementById('window-forward'),
         emptyState: document.getElementById('empty-state'),
         popover: document.getElementById('shift-popover'),
+        fab: document.getElementById('schedule-fab'),
+        fabMenu: document.getElementById('schedule-fab-menu'),
+        fabImportBtn: document.getElementById('fab-import-btn'),
+        fabAiBtn: document.getElementById('fab-ai-btn'),
+        fabAssistBtn: document.getElementById('fab-assist-btn'),
+        fabModal: document.getElementById('fab-modal-backdrop'),
+        fabExportStart: document.getElementById('fab-export-start'),
+        fabExportEnd: document.getElementById('fab-export-end'),
+        fabTemplateBtn: document.getElementById('fab-template-btn'),
+        fabExportBtn: document.getElementById('fab-export-btn'),
+        fabImportFile: document.getElementById('fab-import-file'),
+        fabImportSubmit: document.getElementById('fab-import-submit'),
+        fabImportStatus: document.getElementById('fab-import-status'),
+        assistModal: document.getElementById('assist-modal-backdrop'),
+        assistColorWhite: document.getElementById('assist-color-white'),
+        assistColorMid1: document.getElementById('assist-color-mid1'),
+        assistColorMid2: document.getElementById('assist-color-mid2'),
+        assistColorNight: document.getElementById('assist-color-night'),
+        assistHoverAnnual: document.getElementById('assist-hover-annual'),
+        assistHoverQuarter: document.getElementById('assist-hover-quarter'),
+        assistSummaryEnabled: document.getElementById('assist-summary-enabled'),
+        assistSummaryTotal: document.getElementById('assist-summary-total'),
+        assistSummaryWhite: document.getElementById('assist-summary-white'),
+        assistSummaryMid1: document.getElementById('assist-summary-mid1'),
+        assistSummaryMid2: document.getElementById('assist-summary-mid2'),
+        assistSummaryNight: document.getElementById('assist-summary-night'),
+        assistThresholdTotalHigh: document.getElementById('assist-threshold-total-high'),
+        assistThresholdTotalHighColor: document.getElementById('assist-threshold-total-high-color'),
+        assistThresholdTotalLow: document.getElementById('assist-threshold-total-low'),
+        assistThresholdTotalLowColor: document.getElementById('assist-threshold-total-low-color'),
+        assistThresholdWhiteHigh: document.getElementById('assist-threshold-white-high'),
+        assistThresholdWhiteHighColor: document.getElementById('assist-threshold-white-high-color'),
+        assistThresholdWhiteLow: document.getElementById('assist-threshold-white-low'),
+        assistThresholdWhiteLowColor: document.getElementById('assist-threshold-white-low-color'),
+        assistThresholdMid1High: document.getElementById('assist-threshold-mid1-high'),
+        assistThresholdMid1HighColor: document.getElementById('assist-threshold-mid1-high-color'),
+        assistThresholdMid1Low: document.getElementById('assist-threshold-mid1-low'),
+        assistThresholdMid1LowColor: document.getElementById('assist-threshold-mid1-low-color'),
+        assistThresholdMid2High: document.getElementById('assist-threshold-mid2-high'),
+        assistThresholdMid2HighColor: document.getElementById('assist-threshold-mid2-high-color'),
+        assistThresholdMid2Low: document.getElementById('assist-threshold-mid2-low'),
+        assistThresholdMid2LowColor: document.getElementById('assist-threshold-mid2-low-color'),
+        assistThresholdNightHigh: document.getElementById('assist-threshold-night-high'),
+        assistThresholdNightHighColor: document.getElementById('assist-threshold-night-high-color'),
+        assistThresholdNightLow: document.getElementById('assist-threshold-night-low'),
+        assistThresholdNightLowColor: document.getElementById('assist-threshold-night-low-color'),
+        assistSaveBtn: document.getElementById('assist-settings-save'),
+        assistTooltip: document.getElementById('assist-tooltip'),
       };
 
       let popoverContext = null;
@@ -470,6 +1286,7 @@
             return false;
           }
           state.user = data.user;
+          state.featureFlags = normalizeFeatureFlags(data.user.features);
           elements.userName.textContent = data.user.display_name || '';
           applyViewVisibility(state.user);
           if (!userCanAccessView(state.user, CURRENT_VIEW)) {
@@ -488,6 +1305,7 @@
 
       App.ready(async () => {
         App.initSidebar({ activeView: 'schedule' });
+        App.bindLogoutButtons();
         attachEventListeners();
         const allowed = await ensureLoggedIn();
         if (!allowed) {
@@ -580,12 +1398,24 @@
         });
 
         document.addEventListener('click', (event) => {
-          if (!elements.popover.classList.contains('hidden')) {
+          if (elements.popover && !elements.popover.classList.contains('hidden')) {
             if (!elements.popover.contains(event.target)) {
               const cell = popoverContext?.cell;
               if (cell && !cell.contains(event.target)) {
                 closePopover();
               }
+            }
+          }
+          if (fabMenuVisible) {
+            const target = event.target;
+            if (
+              target instanceof Node &&
+              elements.fabMenu &&
+              !elements.fabMenu.contains(target) &&
+              elements.fab &&
+              !elements.fab.contains(target)
+            ) {
+              closeFabMenu();
             }
           }
         });
@@ -595,13 +1425,121 @@
             positionPopover(popoverContext.cell);
           }
           lockScheduleColumnWidths();
+          ensureFabPositionInView();
+          if (fabMenuVisible) {
+            updateFabMenuPosition();
+          }
         });
 
         document.addEventListener('keydown', (event) => {
           if (event.key === 'Escape') {
             closePopover();
+            closeFabMenu();
+            closeFabModal();
+            closeAssistModal();
           }
         });
+
+        if (elements.fab) {
+          elements.fab.addEventListener('pointerdown', handleFabPointerDown);
+          elements.fab.addEventListener('pointermove', handleFabPointerMove);
+          elements.fab.addEventListener('pointerup', handleFabPointerUp);
+          elements.fab.addEventListener('pointercancel', handleFabPointerCancel);
+          elements.fab.addEventListener('keydown', handleFabKeyDown);
+          elements.fab.addEventListener('click', (event) => event.preventDefault());
+        }
+
+        if (elements.fabImportBtn) {
+          elements.fabImportBtn.addEventListener('click', () => {
+            closeFabMenu();
+            if (!hasFeature(FAB_FEATURE_KEYS.import)) {
+              App.toast('暂无权限使用导入 / 导出功能');
+              return;
+            }
+            openFabModal();
+          });
+        }
+
+        if (elements.fabAiBtn) {
+          elements.fabAiBtn.addEventListener('click', () => {
+            closeFabMenu();
+            if (!hasFeature(FAB_FEATURE_KEYS.ai)) {
+              App.toast('暂无权限使用该功能');
+              return;
+            }
+            App.toast('AI 排班功能即将上线，敬请期待。', { type: 'success', duration: 2600 });
+          });
+        }
+
+        if (elements.fabAssistBtn) {
+          elements.fabAssistBtn.addEventListener('click', () => {
+            closeFabMenu();
+            if (!hasFeature(FAB_FEATURE_KEYS.assist)) {
+              App.toast('暂无权限调整辅助设置');
+              return;
+            }
+            openAssistModal();
+          });
+        }
+
+        if (elements.fabTemplateBtn) {
+          elements.fabTemplateBtn.addEventListener('click', handleFabTemplateDownload);
+        }
+
+        if (elements.fabExportBtn) {
+          elements.fabExportBtn.addEventListener('click', handleFabExport);
+        }
+
+        if (elements.fabImportFile) {
+          elements.fabImportFile.addEventListener('change', handleFabImportFileChange);
+        }
+
+        if (elements.fabImportSubmit) {
+          elements.fabImportSubmit.addEventListener('click', handleFabImportSubmit);
+        }
+
+        if (elements.assistSaveBtn) {
+          elements.assistSaveBtn.addEventListener('click', handleAssistSettingsSave);
+        }
+
+        if (elements.assistSummaryEnabled) {
+          elements.assistSummaryEnabled.addEventListener('change', updateAssistSummaryControlsEnabled);
+        }
+
+        document.querySelectorAll('[data-modal-close]').forEach((button) => {
+          if (button.dataset.modalCloseBound === '1') {
+            return;
+          }
+          button.addEventListener('click', (event) => {
+            event.preventDefault();
+            const backdrop = button.closest('.modal-backdrop');
+            if (backdrop === elements.fabModal) {
+              closeFabModal();
+            } else if (backdrop === elements.assistModal) {
+              closeAssistModal();
+            } else if (backdrop) {
+              backdrop.classList.add('hidden');
+              backdrop.classList.remove('active');
+            }
+          });
+          button.dataset.modalCloseBound = '1';
+        });
+
+        if (elements.fabModal) {
+          elements.fabModal.addEventListener('click', (event) => {
+            if (event.target === elements.fabModal) {
+              closeFabModal();
+            }
+          });
+        }
+
+        if (elements.assistModal) {
+          elements.assistModal.addEventListener('click', (event) => {
+            if (event.target === elements.assistModal) {
+              closeAssistModal();
+            }
+          });
+        }
       }
 
       async function loadScheduleData(options = {}) {
@@ -656,6 +1594,10 @@
           state.shiftOptions = Array.isArray(data.shift_options) ? data.shift_options : [];
           state.days = buildDays(state.start, state.end);
           state.cells = parseCells(data.cells || {});
+          state.assist = normalizeAssistSettings(data.assist_settings);
+          state.featureFlags = normalizeFeatureFlags(state.user ? state.user.features : {});
+          state.dailySummary = computeDailySummary();
+          state.assistStats.clear();
           pendingUpdates.clear();
 
           if (!options.preserveWindow) {
@@ -671,6 +1613,8 @@
           updateWindowInfo();
           renderTable();
           connectSSE();
+          scheduleAssistStatsFetch();
+          updateFloatingBall();
         } finally {
           App.hideLoading();
         }
@@ -813,6 +1757,7 @@
         }
 
         state.cells.set(key, updatedCell);
+        refreshDailySummaryForDay(day);
 
         const cellEl = document.querySelector(`td[data-day="${day}"][data-emp-id="${empId}"]`);
         if (cellEl) {
@@ -916,11 +1861,1077 @@
           badge.className = 'legend-badge';
           const color = document.createElement('span');
           color.className = 'legend-color';
-          color.style.background = getShiftColor(shift);
+          color.style.background = getLegendGradient(shift);
           badge.appendChild(color);
           badge.appendChild(document.createTextNode(shift));
           elements.legend.appendChild(badge);
         });
+      }
+
+      function computeDailySummary() {
+        const map = new Map();
+        state.days.forEach((day) => {
+          map.set(day.date, {
+            total: 0,
+            white: 0,
+            mid1: 0,
+            mid2: 0,
+            night: 0,
+          });
+        });
+
+        state.cells.forEach((cell, key) => {
+          const [day, empId] = key.split('|');
+          if (!map.has(day)) {
+            return;
+          }
+          const entry = map.get(day);
+          const value = cell.value;
+          switch (value) {
+            case '白':
+              entry.white += 1;
+              entry.total += 1;
+              break;
+            case '中1':
+              entry.mid1 += 1;
+              entry.total += 1;
+              break;
+            case '中2':
+              entry.mid2 += 1;
+              entry.total += 1;
+              break;
+            case '夜':
+              entry.night += 1;
+              entry.total += 1;
+              break;
+            default:
+              break;
+          }
+        });
+
+        return map;
+      }
+
+      function getLegendGradient(shift) {
+        const key = SHIFT_VARIANT_KEYS[shift];
+        if (!key) {
+          return 'linear-gradient(135deg, rgba(148,163,184,0.2), rgba(71,85,105,0.16))';
+        }
+        const variant = state.assist.shiftColors[key] || DEFAULT_ASSIST_SETTINGS.shiftColors[key];
+        const palette = SHIFT_VARIANT_STYLES[key] || {};
+        return palette[variant] || palette[DEFAULT_ASSIST_SETTINGS.shiftColors[key]] || 'linear-gradient(135deg, rgba(148,163,184,0.2), rgba(71,85,105,0.16))';
+      }
+
+      function evaluateSummaryThreshold(metric, value) {
+        const config = state.assist.dailySummary.thresholds[metric];
+        if (!config) {
+          return null;
+        }
+        if (config.high.value !== null && value >= config.high.value) {
+          return { type: 'high', color: config.high.color };
+        }
+        if (config.low.value !== null && value <= config.low.value) {
+          return { type: 'low', color: config.low.color };
+        }
+        return null;
+      }
+
+      function renderDateSummary(wrapper, day) {
+        if (!state.assist.dailySummary.enabled) {
+          return;
+        }
+        const summary = state.dailySummary.get(day);
+        if (!summary) {
+          return;
+        }
+        const metrics = [
+          { key: 'total', label: '总', flag: 'showTotal' },
+          { key: 'white', label: '白', flag: 'showWhite' },
+          { key: 'mid1', label: '中1', flag: 'showMid1' },
+          { key: 'mid2', label: '中2', flag: 'showMid2' },
+          { key: 'night', label: '夜', flag: 'showNight' },
+        ];
+
+        const container = document.createElement('div');
+        container.className = 'date-summary';
+
+        metrics.forEach((metric) => {
+          if (!state.assist.dailySummary[metric.flag]) {
+            return;
+          }
+          const value = summary[metric.key];
+          const chip = document.createElement('span');
+          chip.className = 'summary-chip';
+          chip.textContent = `${metric.label}:${value}`;
+          const status = evaluateSummaryThreshold(metric.key, value);
+          if (status) {
+            chip.dataset.state = status.type;
+            chip.classList.add(`summary-chip-${status.color}`);
+          } else {
+            chip.dataset.state = 'none';
+          }
+          container.appendChild(chip);
+        });
+
+        if (container.childElementCount > 0) {
+          wrapper.appendChild(container);
+        }
+      }
+
+      function refreshDailySummaryForDay(day) {
+        const summary = {
+          total: 0,
+          white: 0,
+          mid1: 0,
+          mid2: 0,
+          night: 0,
+        };
+        state.employees.forEach((emp) => {
+          const key = `${day}|${emp.id}`;
+          const cell = state.cells.get(key);
+          const value = cell && typeof cell.value === 'string' ? cell.value : '';
+          switch (value) {
+            case '白':
+              summary.white += 1;
+              summary.total += 1;
+              break;
+            case '中1':
+              summary.mid1 += 1;
+              summary.total += 1;
+              break;
+            case '中2':
+              summary.mid2 += 1;
+              summary.total += 1;
+              break;
+            case '夜':
+              summary.night += 1;
+              summary.total += 1;
+              break;
+            default:
+              break;
+          }
+        });
+        state.dailySummary.set(day, summary);
+        updateDateSummaryElement(day);
+      }
+
+      function updateDateSummaryElement(day) {
+        if (!state.assist.dailySummary.enabled) {
+          return;
+        }
+        const cell = elements.scheduleBody.querySelector(`td.sticky-col-1[data-day="${day}"] .schedule-date-cell`);
+        if (!cell) {
+          return;
+        }
+        const existing = cell.querySelector('.date-summary');
+        if (existing) {
+          existing.remove();
+        }
+        renderDateSummary(cell, day);
+      }
+
+      function scheduleAssistStatsFetch() {
+        if (!state.teamId) {
+          state.assistStats.clear();
+          assistStatsYear = null;
+          return;
+        }
+        if (!state.assist.hover.showAnnual && !state.assist.hover.showQuarterly) {
+          state.assistStats.clear();
+          assistStatsYear = null;
+          hideAssistTooltip();
+          return;
+        }
+        const year = new Date().getFullYear();
+        assistStatsLoading = true;
+        assistStatsYear = year;
+        fetch(`/api/schedule_summary.php?team_id=${state.teamId}&year=${year}`, { credentials: 'include' })
+          .then((response) => {
+            if (response.status === 401) {
+              window.location.href = './login.html';
+              throw new Error('unauth');
+            }
+            if (response.status === 403) {
+              throw new Error('forbidden');
+            }
+            if (!response.ok) {
+              throw new Error('failed');
+            }
+            return response.json();
+          })
+          .then((data) => {
+            if (!data || data.ok !== true || !Array.isArray(data.records)) {
+              throw new Error('invalid');
+            }
+            const map = new Map();
+            data.records.forEach((record) => {
+              map.set(Number(record.id), record);
+            });
+            state.assistStats = map;
+          })
+          .catch((error) => {
+            state.assistStats = new Map();
+            hideAssistTooltip();
+            if (error && error.message === 'forbidden') {
+              App.toast('暂无权限查看班次统计');
+            }
+          })
+          .finally(() => {
+            assistStatsLoading = false;
+          });
+      }
+
+      function getFabButtons() {
+        return [
+          { key: 'import', element: elements.fabImportBtn, feature: FAB_FEATURE_KEYS.import },
+          { key: 'ai', element: elements.fabAiBtn, feature: FAB_FEATURE_KEYS.ai },
+          { key: 'assist', element: elements.fabAssistBtn, feature: FAB_FEATURE_KEYS.assist },
+        ];
+      }
+
+      function getDefaultFabPosition() {
+        const width = elements.fab ? elements.fab.offsetWidth || 64 : 64;
+        const height = elements.fab ? elements.fab.offsetHeight || 64 : 64;
+        return {
+          left: Math.max(FAB_MIN_MARGIN, window.innerWidth - width - FAB_MIN_MARGIN),
+          top: Math.max(FAB_MIN_MARGIN, window.innerHeight - height - 120),
+        };
+      }
+
+      function clampFabPosition(pos) {
+        const width = elements.fab ? elements.fab.offsetWidth || 64 : 64;
+        const height = elements.fab ? elements.fab.offsetHeight || 64 : 64;
+        const maxLeft = Math.max(FAB_MIN_MARGIN, window.innerWidth - width - FAB_MIN_MARGIN);
+        const maxTop = Math.max(FAB_MIN_MARGIN, window.innerHeight - height - FAB_MIN_MARGIN);
+        return {
+          left: Math.min(Math.max(pos.left, FAB_MIN_MARGIN), maxLeft),
+          top: Math.min(Math.max(pos.top, FAB_MIN_MARGIN), maxTop),
+        };
+      }
+
+      function applyFabPosition(pos) {
+        if (!elements.fab) {
+          return;
+        }
+        elements.fab.style.left = `${pos.left}px`;
+        elements.fab.style.top = `${pos.top}px`;
+      }
+
+      function loadFabPosition() {
+        try {
+          const raw = window.localStorage.getItem(FAB_POSITION_STORAGE_KEY);
+          if (!raw) {
+            return null;
+          }
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed.left === 'number' && typeof parsed.top === 'number') {
+            return clampFabPosition({ left: parsed.left, top: parsed.top });
+          }
+        } catch (error) {
+          return null;
+        }
+        return null;
+      }
+
+      function saveFabPosition(pos) {
+        try {
+          window.localStorage.setItem(FAB_POSITION_STORAGE_KEY, JSON.stringify(pos));
+        } catch (error) {
+          /* 忽略本地存储异常 */
+        }
+      }
+
+      function ensureFabPositionInView() {
+        if (!elements.fab) {
+          return;
+        }
+        const base = fabPosition || loadFabPosition() || getDefaultFabPosition();
+        fabPosition = clampFabPosition(base);
+        applyFabPosition(fabPosition);
+      }
+
+      function updateFabMenuPosition() {
+        const menu = elements.fabMenu;
+        const fab = elements.fab;
+        if (!menu || !fab || menu.classList.contains('hidden')) {
+          return;
+        }
+        const fabRect = fab.getBoundingClientRect();
+        const menuRect = menu.getBoundingClientRect();
+        let left = fabRect.left - menuRect.width - 12;
+        let top = fabRect.top;
+        if (left < FAB_MIN_MARGIN) {
+          left = fabRect.right + 12;
+        }
+        if (left + menuRect.width > window.innerWidth - FAB_MIN_MARGIN) {
+          left = Math.max(FAB_MIN_MARGIN, window.innerWidth - menuRect.width - FAB_MIN_MARGIN);
+        }
+        if (top + menuRect.height > window.innerHeight - FAB_MIN_MARGIN) {
+          top = Math.max(FAB_MIN_MARGIN, window.innerHeight - menuRect.height - FAB_MIN_MARGIN);
+        }
+        if (top < FAB_MIN_MARGIN) {
+          top = FAB_MIN_MARGIN;
+        }
+        menu.style.left = `${left}px`;
+        menu.style.top = `${top}px`;
+      }
+
+      function openFabMenu() {
+        const menu = elements.fabMenu;
+        if (!menu || fabMenuVisible) {
+          return;
+        }
+        const visibleButtons = getFabButtons().filter(({ element }) => element && !element.classList.contains('hidden'));
+        if (visibleButtons.length === 0) {
+          return;
+        }
+        menu.classList.remove('hidden');
+        menu.classList.add('active');
+        fabMenuVisible = true;
+        if (elements.fab) {
+          elements.fab.setAttribute('aria-expanded', 'true');
+        }
+        updateFabMenuPosition();
+      }
+
+      function closeFabMenu() {
+        const menu = elements.fabMenu;
+        if (!menu) {
+          return;
+        }
+        menu.classList.remove('active');
+        menu.classList.add('hidden');
+        fabMenuVisible = false;
+        if (elements.fab) {
+          elements.fab.setAttribute('aria-expanded', 'false');
+        }
+      }
+
+      function toggleFabMenu() {
+        if (fabMenuVisible) {
+          closeFabMenu();
+        } else {
+          openFabMenu();
+        }
+      }
+
+      function updateFloatingBall() {
+        const fab = elements.fab;
+        if (!fab || !elements.fabMenu) {
+          return;
+        }
+
+        const hasBallFeature = hasFeature('scheduleFloatingBall');
+        let visibleCount = 0;
+        getFabButtons().forEach(({ element, feature }) => {
+          if (!element) {
+            return;
+          }
+          const allowed = hasBallFeature && hasFeature(feature);
+          element.classList.toggle('hidden', !allowed);
+          element.disabled = !allowed;
+          if (allowed) {
+            visibleCount += 1;
+          }
+        });
+
+        const shouldShow = hasBallFeature && state.teamId && visibleCount > 0;
+        if (!shouldShow) {
+          fab.classList.add('hidden');
+          closeFabMenu();
+          return;
+        }
+
+        fab.classList.remove('hidden');
+        if (!fab.hasAttribute('tabindex')) {
+          fab.setAttribute('tabindex', '0');
+        }
+
+        ensureFabPositionInView();
+        if (fabMenuVisible) {
+          updateFabMenuPosition();
+        }
+      }
+
+      function handleFabPointerDown(event) {
+        if (!elements.fab || (event.pointerType === 'mouse' && event.button !== 0)) {
+          return;
+        }
+        fabPointerActive = true;
+        fabPointerId = event.pointerId;
+        fabDragMoved = false;
+        const rect = elements.fab.getBoundingClientRect();
+        fabDragOffset = {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        };
+        elements.fab.setPointerCapture(event.pointerId);
+        closeFabMenu();
+      }
+
+      function handleFabPointerMove(event) {
+        if (!fabPointerActive || event.pointerId !== fabPointerId) {
+          return;
+        }
+        const nextPosition = clampFabPosition({
+          left: event.clientX - fabDragOffset.x,
+          top: event.clientY - fabDragOffset.y,
+        });
+        if (!fabPosition || Math.abs(nextPosition.left - fabPosition.left) > 0 || Math.abs(nextPosition.top - fabPosition.top) > 0) {
+          fabDragMoved = true;
+          fabPosition = nextPosition;
+          applyFabPosition(fabPosition);
+          updateFabMenuPosition();
+        }
+      }
+
+      function finalizeFabDrag(commit) {
+        if (!elements.fab || !fabPointerActive) {
+          return;
+        }
+        elements.fab.releasePointerCapture(fabPointerId);
+        fabPointerActive = false;
+        if (fabDragMoved && commit && fabPosition) {
+          saveFabPosition(fabPosition);
+        }
+      }
+
+      function handleFabPointerUp(event) {
+        if (event.pointerId !== fabPointerId) {
+          return;
+        }
+        finalizeFabDrag(true);
+        if (!fabDragMoved) {
+          event.preventDefault();
+          toggleFabMenu();
+        }
+      }
+
+      function handleFabPointerCancel(event) {
+        if (event.pointerId !== fabPointerId) {
+          return;
+        }
+        finalizeFabDrag(false);
+      }
+
+      function handleFabKeyDown(event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          toggleFabMenu();
+        }
+      }
+
+      function parseContentDispositionFilename(header) {
+        if (!header) {
+          return null;
+        }
+        const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match && utf8Match[1]) {
+          try {
+            return decodeURIComponent(utf8Match[1]);
+          } catch (error) {
+            return utf8Match[1];
+          }
+        }
+        const asciiMatch = header.match(/filename="?([^";]+)"?/i);
+        if (asciiMatch && asciiMatch[1]) {
+          return asciiMatch[1];
+        }
+        return null;
+      }
+
+      async function downloadWorkbook(url, fallbackName) {
+        let response;
+        try {
+          response = await fetch(url, { credentials: 'include' });
+        } catch (error) {
+          App.toast('网络异常，请稍后重试');
+          return false;
+        }
+        if (response.status === 401) {
+          window.location.href = './login.html';
+          return false;
+        }
+        if (!response.ok) {
+          let message = '操作失败';
+          const type = response.headers.get('Content-Type') || response.headers.get('content-type') || '';
+          if (type.includes('application/json')) {
+            const data = await response.json().catch(() => null);
+            message = (data && (data.error || data.msg)) || message;
+          } else {
+            const text = await response.text().catch(() => '');
+            if (text) {
+              message = text;
+            }
+          }
+          App.toast(message);
+          return false;
+        }
+        const type = response.headers.get('Content-Type') || response.headers.get('content-type') || '';
+        if (type.includes('application/json')) {
+          const data = await response.json().catch(() => null);
+          const message = (data && (data.error || data.msg)) || '操作失败';
+          App.toast(message);
+          return false;
+        }
+        const blob = await response.blob();
+        const disposition = response.headers.get('Content-Disposition') || response.headers.get('content-disposition');
+        const filename = parseContentDispositionFilename(disposition) || fallbackName || `schedule_${Date.now()}.xlsx`;
+        const blobUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = blobUrl;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(blobUrl);
+        return true;
+      }
+
+      function setFabImportStatus(message, tone = '') {
+        if (!elements.fabImportStatus) {
+          return;
+        }
+        elements.fabImportStatus.textContent = message;
+        if (tone) {
+          elements.fabImportStatus.dataset.state = tone;
+        } else {
+          delete elements.fabImportStatus.dataset.state;
+        }
+      }
+
+      function openFabModal() {
+        if (!elements.fabModal) {
+          return;
+        }
+        if (!state.teamId) {
+          App.toast('请选择团队');
+          return;
+        }
+        elements.fabModal.classList.remove('hidden');
+        requestAnimationFrame(() => {
+          elements.fabModal.classList.add('active');
+        });
+        elements.fabModal.setAttribute('aria-hidden', 'false');
+        if (elements.fabExportStart) {
+          elements.fabExportStart.value = state.start || '';
+        }
+        if (elements.fabExportEnd) {
+          elements.fabExportEnd.value = state.end || '';
+        }
+        if (elements.fabImportFile) {
+          elements.fabImportFile.value = '';
+        }
+        if (elements.fabImportSubmit) {
+          elements.fabImportSubmit.disabled = !state.canEdit;
+        }
+        if (!state.canEdit) {
+          setFabImportStatus('当前账号无编辑权限，无法导入', 'warn');
+        } else {
+          setFabImportStatus('');
+        }
+        requestAnimationFrame(() => {
+          if (elements.fabExportStart) {
+            elements.fabExportStart.focus();
+          }
+        });
+      }
+
+      function closeFabModal() {
+        if (!elements.fabModal) {
+          return;
+        }
+        elements.fabModal.classList.remove('active');
+        elements.fabModal.setAttribute('aria-hidden', 'true');
+        window.setTimeout(() => {
+          elements.fabModal.classList.add('hidden');
+        }, 180);
+        if (elements.fabImportSubmit) {
+          elements.fabImportSubmit.disabled = false;
+        }
+      }
+
+      async function handleFabTemplateDownload() {
+        const ok = await downloadWorkbook('/api/schedule_io.php?action=template', 'schedule_template.xlsx');
+        if (ok) {
+          App.toast('模板下载已开始', { type: 'success', duration: 2000 });
+        }
+      }
+
+      async function handleFabExport() {
+        if (!state.teamId) {
+          App.toast('请选择团队');
+          return;
+        }
+        const start = elements.fabExportStart ? elements.fabExportStart.value : '';
+        const end = elements.fabExportEnd ? elements.fabExportEnd.value : '';
+        if (!start || !end) {
+          App.toast('请填写导出日期范围');
+          return;
+        }
+        if (start > end) {
+          App.toast('结束日期不能早于开始日期');
+          return;
+        }
+        const params = new URLSearchParams({
+          action: 'export',
+          team_id: String(state.teamId),
+          start,
+          end,
+        });
+        const ok = await downloadWorkbook(`/api/schedule_io.php?${params.toString()}`, `schedule_${state.teamId}_${start}_${end}.xlsx`);
+        if (ok) {
+          App.toast('已开始导出 Excel', { type: 'success', duration: 2200 });
+        }
+      }
+
+      function handleFabImportFileChange() {
+        if (!elements.fabImportFile) {
+          return;
+        }
+        const file = elements.fabImportFile.files && elements.fabImportFile.files[0];
+        if (file) {
+          setFabImportStatus(`已选择文件：${file.name}`);
+        } else {
+          setFabImportStatus('');
+        }
+      }
+
+      async function handleFabImportSubmit() {
+        if (!hasFeature(FAB_FEATURE_KEYS.import)) {
+          App.toast('暂无权限使用导入 / 导出功能');
+          return;
+        }
+        if (!state.canEdit) {
+          App.toast('当前账号无编辑权限，无法导入');
+          return;
+        }
+        if (!state.teamId) {
+          App.toast('请选择团队');
+          return;
+        }
+        if (!elements.fabImportFile || !elements.fabImportFile.files || elements.fabImportFile.files.length === 0) {
+          App.toast('请先选择导入文件');
+          return;
+        }
+        const file = elements.fabImportFile.files[0];
+        const form = new FormData();
+        form.append('team_id', String(state.teamId));
+        form.append('file', file);
+        setFabImportStatus('正在导入，请稍候…');
+        if (elements.fabImportSubmit) {
+          elements.fabImportSubmit.disabled = true;
+        }
+        let response;
+        try {
+          response = await fetch('/api/schedule_io.php?action=import', {
+            method: 'POST',
+            credentials: 'include',
+            body: form,
+          });
+        } catch (error) {
+          setFabImportStatus('网络异常，导入失败', 'error');
+          if (elements.fabImportSubmit) {
+            elements.fabImportSubmit.disabled = false;
+          }
+          return;
+        }
+        if (response.status === 401) {
+          window.location.href = './login.html';
+          return;
+        }
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data || data.ok !== true) {
+          const message = (data && (data.error || data.msg)) || '导入失败';
+          setFabImportStatus(message, 'error');
+          if (elements.fabImportSubmit) {
+            elements.fabImportSubmit.disabled = false;
+          }
+          return;
+        }
+        const updatedCount = Number.isFinite(Number(data.updated)) ? Number(data.updated) : 0;
+        setFabImportStatus(`导入完成，更新 ${updatedCount} 条记录`, 'success');
+        if (elements.fabImportSubmit) {
+          elements.fabImportSubmit.disabled = false;
+        }
+        if (elements.fabImportFile) {
+          elements.fabImportFile.value = '';
+        }
+        App.toast('排班导入成功', { type: 'success' });
+        loadScheduleData({ preserveWindow: true });
+      }
+
+      function ensureSelectOptions(select, options) {
+        if (!select || !Array.isArray(options)) {
+          return;
+        }
+        if (select.dataset.initialized === '1') {
+          return;
+        }
+        select.innerHTML = options
+          .map((item) => `<option value="${item.value}">${item.label}</option>`)
+          .join('');
+        select.dataset.initialized = '1';
+      }
+
+      function populateAssistControls() {
+        const settings = state.assist ? cloneAssistSettings(state.assist) : cloneAssistSettings();
+
+        ensureSelectOptions(elements.assistColorWhite, SHIFT_COLOR_OPTIONS.white);
+        ensureSelectOptions(elements.assistColorMid1, SHIFT_COLOR_OPTIONS.mid1);
+        ensureSelectOptions(elements.assistColorMid2, SHIFT_COLOR_OPTIONS.mid2);
+        ensureSelectOptions(elements.assistColorNight, SHIFT_COLOR_OPTIONS.night);
+
+        if (elements.assistColorWhite) {
+          elements.assistColorWhite.value = settings.shiftColors.white;
+        }
+        if (elements.assistColorMid1) {
+          elements.assistColorMid1.value = settings.shiftColors.mid1;
+        }
+        if (elements.assistColorMid2) {
+          elements.assistColorMid2.value = settings.shiftColors.mid2;
+        }
+        if (elements.assistColorNight) {
+          elements.assistColorNight.value = settings.shiftColors.night;
+        }
+
+        if (elements.assistHoverAnnual) {
+          elements.assistHoverAnnual.checked = settings.hover.showAnnual;
+        }
+        if (elements.assistHoverQuarter) {
+          elements.assistHoverQuarter.checked = settings.hover.showQuarterly;
+        }
+
+        if (elements.assistSummaryEnabled) {
+          elements.assistSummaryEnabled.checked = settings.dailySummary.enabled;
+        }
+        if (elements.assistSummaryTotal) {
+          elements.assistSummaryTotal.checked = settings.dailySummary.showTotal;
+        }
+        if (elements.assistSummaryWhite) {
+          elements.assistSummaryWhite.checked = settings.dailySummary.showWhite;
+        }
+        if (elements.assistSummaryMid1) {
+          elements.assistSummaryMid1.checked = settings.dailySummary.showMid1;
+        }
+        if (elements.assistSummaryMid2) {
+          elements.assistSummaryMid2.checked = settings.dailySummary.showMid2;
+        }
+        if (elements.assistSummaryNight) {
+          elements.assistSummaryNight.checked = settings.dailySummary.showNight;
+        }
+
+        Object.entries(ASSIST_THRESHOLD_CONTROL_MAP).forEach(([metric, controls]) => {
+          ensureSelectOptions(elements[controls.highColor], SUMMARY_COLOR_OPTIONS);
+          ensureSelectOptions(elements[controls.lowColor], SUMMARY_COLOR_OPTIONS);
+          const config = settings.dailySummary.thresholds[metric];
+          const highValueInput = elements[controls.highValue];
+          const highColorSelect = elements[controls.highColor];
+          const lowValueInput = elements[controls.lowValue];
+          const lowColorSelect = elements[controls.lowColor];
+          if (highValueInput) {
+            highValueInput.value = config.high.value !== null ? config.high.value : '';
+          }
+          if (highColorSelect) {
+            highColorSelect.value = config.high.color;
+          }
+          if (lowValueInput) {
+            lowValueInput.value = config.low.value !== null ? config.low.value : '';
+          }
+          if (lowColorSelect) {
+            lowColorSelect.value = config.low.color;
+          }
+        });
+
+        updateAssistSummaryControlsEnabled();
+      }
+
+      function updateAssistSummaryControlsEnabled() {
+        const enabled = elements.assistSummaryEnabled ? elements.assistSummaryEnabled.checked : false;
+        [
+          elements.assistSummaryTotal,
+          elements.assistSummaryWhite,
+          elements.assistSummaryMid1,
+          elements.assistSummaryMid2,
+          elements.assistSummaryNight,
+        ].forEach((checkbox) => {
+          if (checkbox) {
+            checkbox.disabled = !enabled;
+          }
+        });
+        Object.values(ASSIST_THRESHOLD_CONTROL_MAP).forEach((controls) => {
+          ['highValue', 'highColor', 'lowValue', 'lowColor'].forEach((field) => {
+            const control = elements[controls[field]];
+            if (control) {
+              control.disabled = !enabled;
+            }
+          });
+        });
+      }
+
+      function collectAssistSettingsFromControls() {
+        const settings = cloneAssistSettings();
+        const assignShift = (key, select) => {
+          if (!select) {
+            return;
+          }
+          const value = String(select.value || '').toLowerCase();
+          const options = SHIFT_COLOR_OPTIONS[key] || [];
+          if (options.some((item) => item.value === value)) {
+            settings.shiftColors[key] = value;
+          }
+        };
+        assignShift('white', elements.assistColorWhite);
+        assignShift('mid1', elements.assistColorMid1);
+        assignShift('mid2', elements.assistColorMid2);
+        assignShift('night', elements.assistColorNight);
+
+        if (elements.assistHoverAnnual) {
+          settings.hover.showAnnual = elements.assistHoverAnnual.checked;
+        }
+        if (elements.assistHoverQuarter) {
+          settings.hover.showQuarterly = elements.assistHoverQuarter.checked;
+        }
+
+        if (elements.assistSummaryEnabled) {
+          settings.dailySummary.enabled = elements.assistSummaryEnabled.checked;
+        }
+        if (elements.assistSummaryTotal) {
+          settings.dailySummary.showTotal = elements.assistSummaryTotal.checked;
+        }
+        if (elements.assistSummaryWhite) {
+          settings.dailySummary.showWhite = elements.assistSummaryWhite.checked;
+        }
+        if (elements.assistSummaryMid1) {
+          settings.dailySummary.showMid1 = elements.assistSummaryMid1.checked;
+        }
+        if (elements.assistSummaryMid2) {
+          settings.dailySummary.showMid2 = elements.assistSummaryMid2.checked;
+        }
+        if (elements.assistSummaryNight) {
+          settings.dailySummary.showNight = elements.assistSummaryNight.checked;
+        }
+
+        Object.entries(ASSIST_THRESHOLD_CONTROL_MAP).forEach(([metric, controls]) => {
+          const config = settings.dailySummary.thresholds[metric];
+          const highValueInput = elements[controls.highValue];
+          const highColorSelect = elements[controls.highColor];
+          const lowValueInput = elements[controls.lowValue];
+          const lowColorSelect = elements[controls.lowColor];
+          const highValue = highValueInput ? Number.parseInt(highValueInput.value, 10) : NaN;
+          config.high.value = Number.isFinite(highValue) && highValue >= 0 ? highValue : null;
+          const highColor = highColorSelect ? String(highColorSelect.value || '').toLowerCase() : '';
+          if (SUMMARY_COLOR_OPTIONS.some((item) => item.value === highColor)) {
+            config.high.color = highColor;
+          }
+          const lowValue = lowValueInput ? Number.parseInt(lowValueInput.value, 10) : NaN;
+          config.low.value = Number.isFinite(lowValue) && lowValue >= 0 ? lowValue : null;
+          const lowColor = lowColorSelect ? String(lowColorSelect.value || '').toLowerCase() : '';
+          if (SUMMARY_COLOR_OPTIONS.some((item) => item.value === lowColor)) {
+            config.low.color = lowColor;
+          }
+        });
+
+        return settings;
+      }
+
+      function openAssistModal() {
+        if (!elements.assistModal) {
+          return;
+        }
+        if (!state.teamId) {
+          App.toast('请选择团队');
+          return;
+        }
+        populateAssistControls();
+        elements.assistModal.classList.remove('hidden');
+        requestAnimationFrame(() => {
+          elements.assistModal.classList.add('active');
+        });
+        elements.assistModal.setAttribute('aria-hidden', 'false');
+        requestAnimationFrame(() => {
+          if (elements.assistColorWhite) {
+            elements.assistColorWhite.focus();
+          }
+        });
+      }
+
+      function closeAssistModal() {
+        if (!elements.assistModal) {
+          return;
+        }
+        elements.assistModal.classList.remove('active');
+        elements.assistModal.setAttribute('aria-hidden', 'true');
+        window.setTimeout(() => {
+          elements.assistModal.classList.add('hidden');
+        }, 180);
+        if (elements.assistSaveBtn) {
+          elements.assistSaveBtn.disabled = false;
+        }
+      }
+
+      async function handleAssistSettingsSave() {
+        if (!hasFeature(FAB_FEATURE_KEYS.assist)) {
+          App.toast('暂无权限调整辅助设置');
+          return;
+        }
+        if (!state.teamId) {
+          App.toast('请选择团队');
+          return;
+        }
+        const payload = collectAssistSettingsFromControls();
+        if (elements.assistSaveBtn) {
+          elements.assistSaveBtn.disabled = true;
+        }
+        let response;
+        try {
+          response = await fetch('/api/schedule.php', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'update_settings',
+              team_id: state.teamId,
+              assist: payload,
+            }),
+          });
+        } catch (error) {
+          App.toast('网络异常，保存失败');
+          if (elements.assistSaveBtn) {
+            elements.assistSaveBtn.disabled = false;
+          }
+          return;
+        }
+        if (response.status === 401) {
+          window.location.href = './login.html';
+          return;
+        }
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data || data.ok !== true) {
+          const message = (data && (data.error || data.msg)) || '保存失败';
+          App.toast(message);
+          if (elements.assistSaveBtn) {
+            elements.assistSaveBtn.disabled = false;
+          }
+          return;
+        }
+        const normalized = normalizeAssistSettings(data.assist_settings);
+        state.assist = normalized;
+        state.dailySummary = computeDailySummary();
+        renderLegend();
+        renderTable();
+        scheduleAssistStatsFetch();
+        updateFloatingBall();
+        App.toast('辅助设置已保存', { type: 'success' });
+        closeAssistModal();
+      }
+
+      function attachEmployeeHover() {
+        if (!elements.scheduleHead) {
+          return;
+        }
+        const headers = elements.scheduleHead.querySelectorAll('th[data-emp-id]');
+        headers.forEach((th) => {
+          if (th.dataset.hoverBound === '1') {
+            return;
+          }
+          th.addEventListener('mouseenter', handleEmployeeHoverEnter);
+          th.addEventListener('mousemove', handleEmployeeHoverMove);
+          th.addEventListener('mouseleave', handleEmployeeHoverLeave);
+          th.dataset.hoverBound = '1';
+        });
+      }
+
+      function handleEmployeeHoverEnter(event) {
+        if (!state.assist.hover.showAnnual && !state.assist.hover.showQuarterly) {
+          return;
+        }
+        const target = event.currentTarget;
+        const empId = Number(target.dataset.empId);
+        if (!Number.isFinite(empId)) {
+          return;
+        }
+        if (!state.assistStats.has(empId) && !assistStatsLoading) {
+          scheduleAssistStatsFetch();
+        }
+        showAssistTooltip(target, empId);
+        positionAssistTooltip(event.clientX, event.clientY);
+      }
+
+      function handleEmployeeHoverMove(event) {
+        if (elements.assistTooltip && !elements.assistTooltip.classList.contains('hidden')) {
+          positionAssistTooltip(event.clientX, event.clientY);
+        }
+      }
+
+      function handleEmployeeHoverLeave() {
+        hideAssistTooltip();
+      }
+
+      function showAssistTooltip(target, empId) {
+        const tooltip = elements.assistTooltip;
+        if (!tooltip) {
+          return;
+        }
+        tooltip.classList.remove('hidden');
+        const record = state.assistStats.get(empId);
+        let content = '';
+        const headerName = target.querySelector('.schedule-emp-head-name');
+        const displayName = headerName ? headerName.textContent : target.textContent;
+        const baseName = displayName || `成员 #${empId}`;
+        if (record) {
+          content += `<h4>${baseName}</h4>`;
+          if (state.assist.hover.showAnnual) {
+            const annual = record.annual || {};
+            content += '<table><thead><tr><th>类型</th><th>天数</th></tr></thead><tbody>';
+            content += `<tr><th>白班</th><td>${annual.white || 0}</td></tr>`;
+            content += `<tr><th>中班1</th><td>${annual.mid1 || 0}</td></tr>`;
+            content += `<tr><th>中班2</th><td>${annual.mid2 || 0}</td></tr>`;
+            content += `<tr><th>夜班</th><td>${annual.night || 0}</td></tr>`;
+            content += '</tbody></table>';
+          }
+          if (state.assist.hover.showQuarterly) {
+            const quarters = record.quarters || {};
+            content += '<div class="mt-2 text-xs text-slate-400">季度统计</div>';
+            content += '<table><thead><tr><th></th><th>白</th><th>中1</th><th>中2</th><th>夜</th></tr></thead><tbody>';
+            ['q1', 'q2', 'q3', 'q4'].forEach((quarter) => {
+              const data = quarters[quarter] || {};
+              const label = quarter.toUpperCase();
+              content += `<tr><th>${label}</th><td>${data.white || 0}</td><td>${data.mid1 || 0}</td><td>${data.mid2 || 0}</td><td>${data.night || 0}</td></tr>`;
+            });
+            content += '</tbody></table>';
+          }
+        } else if (assistStatsLoading) {
+          content = `<h4>${baseName}</h4><p class="text-xs text-slate-400">统计数据加载中…</p>`;
+        } else {
+          content = `<h4>${baseName}</h4><p class="text-xs text-slate-400">暂无统计数据</p>`;
+        }
+        tooltip.innerHTML = content;
+      }
+
+      function hideAssistTooltip() {
+        if (elements.assistTooltip) {
+          elements.assistTooltip.classList.add('hidden');
+        }
+      }
+
+      function positionAssistTooltip(x, y) {
+        const tooltip = elements.assistTooltip;
+        if (!tooltip) {
+          return;
+        }
+        const offset = 16;
+        const margin = 12;
+        const width = tooltip.offsetWidth || tooltip.clientWidth || 220;
+        const height = tooltip.offsetHeight || tooltip.clientHeight || 160;
+        const maxLeft = window.innerWidth - width - margin;
+        const maxTop = window.innerHeight - height - margin;
+        const desiredLeft = x + offset;
+        const desiredTop = y + offset;
+        const clampedLeft = Math.max(margin, Math.min(desiredLeft, maxLeft));
+        const clampedTop = Math.max(margin, Math.min(desiredTop, maxTop));
+        tooltip.style.left = `${clampedLeft}px`;
+        tooltip.style.top = `${clampedTop}px`;
       }
 
       function parseCells(cells) {
@@ -1011,6 +3022,7 @@
           th.dataset.empId = String(emp.id);
           th.className = 'schedule-emp-head';
           const nameLine = document.createElement('span');
+          nameLine.className = 'schedule-emp-head-name';
           nameLine.textContent = emp.display_name || emp.name || `成员#${emp.id}`;
           th.appendChild(nameLine);
           if (emp.display_name && emp.name && emp.display_name !== emp.name) {
@@ -1053,6 +3065,7 @@
           dateSub.textContent = `星期${day.weekday}`;
           dateWrap.appendChild(dateLabel);
           dateWrap.appendChild(dateSub);
+          renderDateSummary(dateWrap, day.date);
           dateTd.appendChild(dateWrap);
           tr.appendChild(dateTd);
 
@@ -1087,10 +3100,8 @@
 
             if (cellData.value) {
               inner.textContent = cellData.value;
-              const shiftClass = getShiftClass(cellData.value);
-              if (shiftClass) {
-                inner.classList.add(shiftClass);
-              }
+              const shiftClasses = getShiftClasses(cellData.value);
+              shiftClasses.forEach((cls) => inner.classList.add(cls));
             } else {
               inner.textContent = '—';
               inner.classList.add('empty');
@@ -1124,6 +3135,7 @@
 
         elements.scheduleBody.appendChild(fragment);
         lockScheduleColumnWidths();
+        attachEmployeeHover();
       }
 
       function lockScheduleColumnWidths() {
@@ -1429,10 +3441,8 @@
 
         if (cellData.value) {
           inner.textContent = cellData.value;
-          const shiftClass = getShiftClass(cellData.value);
-          if (shiftClass) {
-            inner.classList.add(shiftClass);
-          }
+          const shiftClasses = getShiftClasses(cellData.value);
+          shiftClasses.forEach((cls) => inner.classList.add(cls));
         } else {
           inner.textContent = '—';
           inner.classList.add('empty');
@@ -1447,40 +3457,25 @@
         if (inner) {
           App.flash(inner);
         }
-      }
-
-      function getShiftClass(shift) {
-        switch (shift) {
-          case '白':
-            return SHIFT_STYLE.get('白');
-          case '中1':
-            return SHIFT_STYLE.get('中1');
-          case '中2':
-            return SHIFT_STYLE.get('中2');
-          case '夜':
-            return SHIFT_STYLE.get('夜');
-          case '休息':
-            return SHIFT_STYLE.get('休息');
-          default:
-            return '';
+        if (cell && cell.dataset && cell.dataset.day) {
+          refreshDailySummaryForDay(cell.dataset.day);
         }
       }
 
-      function getShiftColor(shift) {
-        switch (shift) {
-          case '白':
-            return 'linear-gradient(135deg, rgba(56,189,248,0.4), rgba(59,130,246,0.35))';
-          case '中1':
-            return 'linear-gradient(135deg, rgba(129,140,248,0.4), rgba(14,116,144,0.35))';
-          case '中2':
-            return 'linear-gradient(135deg, rgba(14,116,144,0.4), rgba(6,78,59,0.35))';
-          case '夜':
-            return 'linear-gradient(135deg, rgba(244,114,182,0.45), rgba(236,72,153,0.35))';
-          case '休息':
-            return 'linear-gradient(135deg, rgba(34,197,94,0.45), rgba(74,222,128,0.35))';
-          default:
-            return 'rgba(148, 163, 184, 0.3)';
+      function getShiftClasses(shift) {
+        if (shift === '休息') {
+          return [SHIFT_STYLE.get('休息')];
         }
+        const base = SHIFT_STYLE.get(shift);
+        if (!base) {
+          return [];
+        }
+        const key = SHIFT_VARIANT_KEYS[shift];
+        if (!key) {
+          return [base];
+        }
+        const variant = state.assist.shiftColors[key] || DEFAULT_ASSIST_SETTINGS.shiftColors[key];
+        return [base, `shift-variant-${variant}`];
       }
 
       function getEmployeeName(empId) {
