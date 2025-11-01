@@ -1151,16 +1151,7 @@
       }
 
       function hasFeature(key) {
-        if (state.user && state.user.is_admin) {
-          return true;
-        }
-        if (!state.featureFlags) {
-          return false;
-        }
-        if (Object.prototype.hasOwnProperty.call(state.featureFlags, key)) {
-          return Boolean(state.featureFlags[key]);
-        }
-        return false;
+        return Boolean(state.featureFlags && state.featureFlags[key]);
       }
 
       function userCanAccessView(user, view) {
@@ -1468,118 +1459,6 @@
             openFabModal();
           });
         }
-
-        if (elements.fabAiBtn) {
-          elements.fabAiBtn.addEventListener('click', () => {
-            closeFabMenu();
-            if (!hasFeature(FAB_FEATURE_KEYS.ai)) {
-              App.toast('暂无权限使用该功能');
-              return;
-            }
-            App.toast('AI 排班功能即将上线，敬请期待。', { type: 'success', duration: 2600 });
-          });
-        }
-
-        if (elements.fabAssistBtn) {
-          elements.fabAssistBtn.addEventListener('click', () => {
-            closeFabMenu();
-            if (!hasFeature(FAB_FEATURE_KEYS.assist)) {
-              App.toast('暂无权限调整辅助设置');
-              return;
-            }
-            openAssistModal();
-          });
-        }
-
-        if (elements.fabTemplateBtn) {
-          elements.fabTemplateBtn.addEventListener('click', handleFabTemplateDownload);
-        }
-
-        if (elements.fabExportBtn) {
-          elements.fabExportBtn.addEventListener('click', handleFabExport);
-        }
-
-        if (elements.fabImportFile) {
-          elements.fabImportFile.addEventListener('change', handleFabImportFileChange);
-        }
-
-        if (elements.fabImportSubmit) {
-          elements.fabImportSubmit.addEventListener('click', handleFabImportSubmit);
-        }
-
-        if (elements.assistSaveBtn) {
-          elements.assistSaveBtn.addEventListener('click', handleAssistSettingsSave);
-        }
-
-        if (elements.assistSummaryEnabled) {
-          elements.assistSummaryEnabled.addEventListener('change', updateAssistSummaryControlsEnabled);
-        }
-
-        document.querySelectorAll('[data-modal-close]').forEach((button) => {
-          if (button.dataset.modalCloseBound === '1') {
-            return;
-          }
-          button.addEventListener('click', (event) => {
-            event.preventDefault();
-            const backdrop = button.closest('.modal-backdrop');
-            if (backdrop === elements.fabModal) {
-              closeFabModal();
-            } else if (backdrop === elements.assistModal) {
-              closeAssistModal();
-            } else if (backdrop) {
-              backdrop.classList.add('hidden');
-              backdrop.classList.remove('active');
-            }
-          });
-          button.dataset.modalCloseBound = '1';
-        });
-
-        if (elements.fabModal) {
-          elements.fabModal.addEventListener('click', (event) => {
-            if (event.target === elements.fabModal) {
-              closeFabModal();
-            }
-          });
-        }
-
-        if (elements.assistModal) {
-          elements.assistModal.addEventListener('click', (event) => {
-            if (event.target === elements.assistModal) {
-              closeAssistModal();
-            }
-          });
-        }
-      }
-
-      async function loadScheduleData(options = {}) {
-        teardownSSE();
-        if (!userCanAccessView(state.user, CURRENT_VIEW)) {
-          App.toast('无权访问该视图');
-          return;
-        }
-        App.showLoading('正在加载排班数据…');
-        try {
-          const params = new URLSearchParams();
-          if (state.teamId) {
-            params.set('team_id', String(state.teamId));
-          }
-          if (state.start) {
-            params.set('start', state.start);
-          }
-          if (state.end) {
-            params.set('end', state.end);
-          }
-
-          const baseUrl = '/api/schedule.php';
-          const url = params.toString() ? `${baseUrl}?${params}` : baseUrl;
-
-          let response;
-          try {
-            response = await fetch(url, { credentials: 'include' });
-          } catch (error) {
-            App.toast('网络异常，无法加载排班');
-            return;
-          }
 
         if (elements.fabAiBtn) {
           elements.fabAiBtn.addEventListener('click', () => {
