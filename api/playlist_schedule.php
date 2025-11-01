@@ -230,8 +230,48 @@ function handle_playlist_auto_fill(array $payload): void
 
     $days = playlist_generate_days($startDate, $endDate);
 
-    $whiteAssignments = playlist_generate_assignments($days, $employees, max($whiteDuration, 0.0), $maxDiff, []);
-    $midAssignments = playlist_generate_assignments($days, $employees, max($midDuration, 0.0), $maxDiff, $whiteAssignments);
+    $onDutyMap = playlist_fetch_on_duty($pdo, $teamId, $startDate, $endDate);
+    $availability = [];
+    $missingDays = [];
+    foreach ($days as $day) {
+        $roster = $onDutyMap[$day] ?? [];
+        if ($roster === []) {
+            $missingDays[] = $day;
+            continue;
+        }
+        $allowed = [];
+        foreach ($roster as $empId) {
+            $id = (int) $empId;
+            if (in_array($id, $empList, true)) {
+                $allowed[$id] = $id;
+            }
+        }
+        if ($allowed === []) {
+            $missingDays[] = $day;
+            continue;
+        }
+        $availability[$day] = array_values($allowed);
+    }
+
+    if ($availability === []) {
+        json_err('所选时间段内排班日历为空，存在空班次，请先在排班日历维护班次', 422);
+    }
+
+    $whiteAssignments = playlist_generate_assignments($days, $employees, max($whiteDuration, 0.0), $maxDiff, [], $availability);
+    $midAssignments = playlist_generate_assignments($days, $employees, max($midDuration, 0.0), $maxDiff, $whiteAssignments, $availability);
+
+    $emptyShiftWarnings = [];
+    foreach ($days as $day) {
+        if (!isset($availability[$day])) {
+            continue;
+        }
+        if (!isset($whiteAssignments[$day])) {
+            $emptyShiftWarnings[] = $day . ' 白班';
+        }
+        if (!isset($midAssignments[$day])) {
+            $emptyShiftWarnings[] = $day . ' 中班';
+        }
+    }
 
     $pdo->beginTransaction();
     try {
@@ -240,13 +280,17 @@ function handle_playlist_auto_fill(array $payload): void
             $whiteEmp = $whiteAssignments[$day] ?? null;
             $midEmp = $midAssignments[$day] ?? null;
 
-            if ($whiteEmp !== null) {
+            if ($whiteEmp !== null && isset($map[$whiteEmp])) {
                 $info = $map[$whiteEmp];
                 playlist_store_cell($pdo, $teamId, $day, 'white', $info['id'], $info['label'], $userId, 0, true);
+            } else {
+                playlist_store_cell($pdo, $teamId, $day, 'white', null, '', $userId, 0, true);
             }
-            if ($midEmp !== null) {
+            if ($midEmp !== null && isset($map[$midEmp])) {
                 $info = $map[$midEmp];
                 playlist_store_cell($pdo, $teamId, $day, 'mid', $info['id'], $info['label'], $userId, 0, true);
+            } else {
+                playlist_store_cell($pdo, $teamId, $day, 'mid', null, '', $userId, 0, true);
             }
         }
         $pdo->commit();
@@ -275,6 +319,10 @@ function handle_playlist_auto_fill(array $payload): void
     json_ok([
         'cells' => $grid,
         'on_duty' => playlist_fetch_on_duty($pdo, $teamId, $startDate, $endDate),
+        'warnings' => [
+            'missing_days' => array_values($missingDays),
+            'empty_shifts' => array_values($emptyShiftWarnings),
+        ],
     ]);
 }
 
@@ -661,7 +709,14 @@ function playlist_generate_days(string $startDate, string $endDate): array
     return $days;
 }
 
-function playlist_generate_assignments(array $days, array $employees, float $duration, float $maxDiff, array $avoidSameDay): array
+function playlist_generate_assignments(
+    array $days,
+    array $employees,
+    float $duration,
+    float $maxDiff,
+    array $avoidSameDay,
+    array $availabilityByDay = []
+): array
 {
     $order = [];
     foreach ($employees as $index => $emp) {
@@ -683,7 +738,36 @@ function playlist_generate_assignments(array $days, array $employees, float $dur
             $forbidden[] = $avoidSameDay[$day];
         }
 
+        $allowed = null;
+        if (array_key_exists($day, $availabilityByDay)) {
+            $allowedList = $availabilityByDay[$day];
+            if (!is_array($allowedList) || $allowedList === []) {
+                continue;
+            }
+            $allowed = [];
+            foreach ($allowedList as $value) {
+                $id = (int) $value;
+                if (isset($order[$id])) {
+                    $allowed[$id] = true;
+                }
+            }
+            if ($allowed === []) {
+                continue;
+            }
+        }
+
         $candidates = $employees;
+        if ($allowed !== null) {
+            $candidates = array_values(array_filter($employees, static function ($emp) use ($allowed) {
+                $empId = (int) ($emp['id'] ?? 0);
+                return isset($allowed[$empId]);
+            }));
+        }
+
+        if ($candidates === []) {
+            continue;
+        }
+
         usort($candidates, static function ($a, $b) use ($counts, $order): int {
             $aId = (int) $a['id'];
             $bId = (int) $b['id'];
