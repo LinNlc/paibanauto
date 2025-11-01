@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>排班助手 - 播单专辑排班</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./app.css?v=20240610" />
+    <script src="./app.js?v=20240610"></script>
+    <style>
+      .playlist-card {
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(71, 85, 105, 0.25);
+        border-radius: 1.75rem;
+        box-shadow: 0 22px 45px rgba(15, 23, 42, 0.45);
+      }
+
+      .playlist-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+      }
+
+      .playlist-table thead th {
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        letter-spacing: 0.32em;
+        color: rgba(148, 163, 184, 0.7);
+        background: rgba(15, 23, 42, 0.82);
+      }
+
+      .playlist-table th,
+      .playlist-table td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid rgba(71, 85, 105, 0.18);
+      }
+
+      .playlist-table tbody tr:nth-child(even) td {
+        background: rgba(15, 23, 42, 0.5);
+      }
+
+      .playlist-table tbody tr:last-child td {
+        border-bottom: none;
+      }
+
+      .playlist-cell {
+        width: 100%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.9rem;
+        background: rgba(30, 41, 59, 0.65);
+        color: rgba(226, 232, 240, 0.82);
+        font-weight: 500;
+        transition: all 0.18s ease;
+      }
+
+      .playlist-cell:not(.is-disabled) {
+        cursor: pointer;
+      }
+
+      .playlist-cell:not(.is-disabled):hover {
+        transform: translateY(-1px);
+        box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35);
+      }
+
+      .playlist-cell.has-value.cell-white {
+        background: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(37, 99, 235, 0.2));
+        color: #e0f2fe;
+        box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.35);
+      }
+
+      .playlist-cell.has-value.cell-mid {
+        background: linear-gradient(135deg, rgba(129, 140, 248, 0.2), rgba(14, 165, 233, 0.18));
+        color: #ede9fe;
+        box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.35);
+      }
+
+      .playlist-cell.is-disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .playlist-picker {
+        position: absolute;
+        width: 260px;
+        z-index: 80;
+        background: rgba(15, 23, 42, 0.98);
+        border: 1px solid rgba(71, 85, 105, 0.35);
+        border-radius: 1rem;
+        padding: 1rem;
+        box-shadow: 0 24px 50px rgba(15, 23, 42, 0.55);
+      }
+
+      .playlist-picker header {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: rgba(226, 232, 240, 0.92);
+        margin-bottom: 0.75rem;
+      }
+
+      .playlist-picker.hidden {
+        display: none;
+      }
+
+      .playlist-picker select {
+        width: 100%;
+        background: rgba(30, 41, 59, 0.9);
+        border: 1px solid rgba(71, 85, 105, 0.45);
+        border-radius: 0.75rem;
+        padding: 0.45rem 0.75rem;
+        color: rgba(226, 232, 240, 0.9);
+        margin-bottom: 0.75rem;
+      }
+
+      .playlist-picker .action-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+      }
+
+      .playlist-picker .action-row button {
+        flex: 1;
+        padding: 0.45rem 0.75rem;
+        border-radius: 0.75rem;
+        font-size: 0.85rem;
+      }
+
+      .playlist-picker .action-row button.confirm {
+        background: linear-gradient(135deg, rgba(56, 189, 248, 0.32), rgba(14, 165, 233, 0.32));
+        border: 1px solid rgba(56, 189, 248, 0.45);
+        color: #0ea5e9;
+      }
+
+      .playlist-picker .action-row button.clear {
+        background: rgba(30, 41, 59, 0.85);
+        border: 1px solid rgba(71, 85, 105, 0.45);
+        color: rgba(148, 163, 184, 0.85);
+      }
+
+      .playlist-picker .action-row button.cancel {
+        background: transparent;
+        border: none;
+        color: rgba(148, 163, 184, 0.75);
+      }
+
+      .fab-shell {
+        position: fixed;
+        bottom: 32px;
+        right: 32px;
+        z-index: 70;
+        display: none;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.75rem;
+      }
+
+      .fab-shell.show {
+        display: flex;
+      }
+
+      .fab-button {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, rgba(56, 189, 248, 0.32), rgba(37, 99, 235, 0.32));
+        border: 1px solid rgba(56, 189, 248, 0.5);
+        color: #e0f2fe;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.45);
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+      }
+
+      .fab-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 24px 52px rgba(15, 23, 42, 0.55);
+      }
+
+      .fab-menu {
+        display: none;
+        flex-direction: column;
+        gap: 0.5rem;
+        width: 220px;
+        padding: 0.85rem;
+        border-radius: 1.1rem;
+        background: rgba(15, 23, 42, 0.94);
+        border: 1px solid rgba(71, 85, 105, 0.35);
+        box-shadow: 0 22px 48px rgba(15, 23, 42, 0.45);
+      }
+
+      .fab-shell.open .fab-menu {
+        display: flex;
+      }
+
+      .fab-menu button {
+        width: 100%;
+        padding: 0.55rem 0.75rem;
+        border-radius: 0.8rem;
+        text-align: left;
+        font-size: 0.9rem;
+        background: rgba(30, 41, 59, 0.85);
+        border: 1px solid rgba(71, 85, 105, 0.4);
+        color: rgba(226, 232, 240, 0.88);
+        transition: background 0.18s ease, border 0.18s ease;
+      }
+
+      .fab-menu button:hover {
+        background: rgba(56, 189, 248, 0.12);
+        border-color: rgba(56, 189, 248, 0.35);
+      }
+
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.88);
+        backdrop-filter: blur(6px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 75;
+        padding: 2rem 1rem;
+      }
+
+      .modal-overlay.show {
+        display: flex;
+      }
+
+      .modal-surface {
+        width: min(520px, 100%);
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid rgba(71, 85, 105, 0.35);
+        border-radius: 1.5rem;
+        padding: 1.5rem;
+        box-shadow: 0 26px 60px rgba(15, 23, 42, 0.55);
+      }
+
+      .modal-surface h2 {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: rgba(226, 232, 240, 0.95);
+        margin-bottom: 1rem;
+      }
+
+      .modal-surface .form-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      }
+
+      .modal-surface label {
+        display: block;
+        font-size: 0.85rem;
+        color: rgba(148, 163, 184, 0.8);
+        margin-bottom: 0.35rem;
+      }
+
+      .modal-surface input[type='number'],
+      .modal-surface input[type='date'] {
+        width: 100%;
+        border-radius: 0.85rem;
+        border: 1px solid rgba(71, 85, 105, 0.45);
+        background: rgba(30, 41, 59, 0.9);
+        color: rgba(226, 232, 240, 0.92);
+        padding: 0.5rem 0.75rem;
+      }
+
+      .modal-emp-list {
+        max-height: 220px;
+        overflow-y: auto;
+        border: 1px solid rgba(71, 85, 105, 0.35);
+        border-radius: 1rem;
+        padding: 0.75rem;
+        background: rgba(30, 41, 59, 0.6);
+      }
+
+      .modal-emp-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: rgba(226, 232, 240, 0.88);
+        padding: 0.35rem 0.25rem;
+      }
+
+      .modal-footer {
+        margin-top: 1.25rem;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+      }
+
+      .modal-footer button {
+        padding: 0.55rem 1.2rem;
+        border-radius: 0.9rem;
+      }
+
+      .modal-footer .btn-primary {
+        background: linear-gradient(135deg, rgba(56, 189, 248, 0.32), rgba(37, 99, 235, 0.32));
+        border: 1px solid rgba(56, 189, 248, 0.45);
+        color: #e0f2fe;
+      }
+
+      .modal-footer .btn-secondary {
+        background: rgba(30, 41, 59, 0.85);
+        border: 1px solid rgba(71, 85, 105, 0.45);
+        color: rgba(148, 163, 184, 0.9);
+      }
+
+      @media (max-width: 768px) {
+        .fab-shell {
+          right: 20px;
+          bottom: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <button type="button" class="app-sidebar-toggle" data-sidebar-toggle aria-label="展开菜单">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <div class="sidebar-inner">
+          <div class="sidebar-header">排班助手</div>
+          <nav>
+            <a href="./index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
+            <a href="./people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
+            <div class="nav-group" data-nav-group="schedule">
+              <a href="./schedule.html" data-view="schedule" class="nav-primary"><span class="nav-indicator"></span>排班表</a>
+              <a href="./playlist-schedule.html" data-view="playlistschedule" class="nav-secondary is-active" data-subview="schedule">
+                <span class="nav-indicator"></span>播单专辑排班
+              </a>
+            </div>
+            <a href="./stats.html" data-view="stats"><span class="nav-indicator"></span>数据统计</a>
+            <a href="./admin.html" data-view="admin"><span class="nav-indicator"></span>权限设置</a>
+          </nav>
+          <section class="sidebar-meta">
+            <div class="sidebar-version">
+              <span class="sidebar-version-label">当前版本</span>
+              <div class="sidebar-version-value">
+                <span class="sidebar-version-number" data-app-version>—</span>
+                <span class="sidebar-version-date">更新时间：<span data-app-release>—</span></span>
+              </div>
+            </div>
+            <div class="sidebar-changelog">
+              <div class="sidebar-changelog-title">更新日志</div>
+              <ul class="sidebar-changelog-list" data-app-changelog></ul>
+            </div>
+          </section>
+        </div>
+      </aside>
+      <main class="app-main space-y-8 pb-16">
+        <header class="app-header">
+          <div class="header-topline">
+            <div>
+              <div class="inline-flex items-center gap-2 text-sm text-slate-400">
+                <span class="px-3 py-1 rounded-full border border-slate-700/60 bg-slate-900/70">播单管理</span>
+                <span class="hidden sm:inline">专辑排班计划</span>
+              </div>
+              <h1 class="header-title mt-2">播单专辑排班</h1>
+              <p class="header-subtitle">在统一视图中维护播单专辑的白班与中班排班，可自动生成并支持Excel导入导出。</p>
+            </div>
+            <div class="flex items-center gap-3 text-sm text-slate-300">
+              <span>当前用户：<span id="user-name" class="text-slate-100 font-medium"></span></span>
+              <button type="button" class="btn-secondary" data-action="logout">退出登录</button>
+            </div>
+          </div>
+          <div class="app-toolbar">
+            <div class="toolbar-controls flex-wrap gap-4">
+              <div class="toolbar-group min-w-[200px]">
+                <label class="block text-xs uppercase tracking-[0.25em] text-slate-500">当前团队</label>
+                <select id="team-select" class="select-input mt-2"></select>
+              </div>
+              <div class="toolbar-group">
+                <label for="start-date">起始日期</label>
+                <input id="start-date" type="date" class="select-input" />
+              </div>
+              <div class="toolbar-group">
+                <label for="end-date">结束日期</label>
+                <input id="end-date" type="date" class="select-input" />
+              </div>
+            </div>
+            <div class="toolbar-controls gap-3">
+              <button id="apply-range" type="button" class="btn-primary">应用筛选</button>
+              <button id="refresh-btn" type="button" class="btn-secondary">刷新</button>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-3 text-sm text-slate-300">
+            <span id="range-info" class="px-3 py-1.5 rounded-full border border-slate-800/60 bg-slate-900/70"></span>
+            <span id="team-info" class="px-3 py-1.5 rounded-full border border-slate-800/60 bg-slate-900/70"></span>
+          </div>
+        </header>
+
+        <section id="access-denied" class="hidden text-center py-20 bg-slate-900/60 border border-slate-800/60 rounded-3xl">
+          <h2 class="text-2xl font-semibold mb-2 text-slate-100">暂无访问权限</h2>
+          <p class="text-slate-400">请联系管理员为当前账号开启“播单专辑排班”视图权限。</p>
+          <a href="./index.html" class="btn-secondary mt-6 inline-flex items-center gap-2">返回首页</a>
+        </section>
+
+        <section id="playlist-shell" class="space-y-6 hidden">
+          <div class="playlist-card p-6 space-y-4">
+            <div class="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h2 class="text-lg font-semibold text-slate-100">播单排班表</h2>
+                <p class="text-sm text-slate-400">每个日期白班与中班各一人，可直接点击单元格调整。</p>
+              </div>
+              <div class="text-xs text-slate-500">提示：仅已授权的账号可使用悬浮球进行自动排班与导入导出。</div>
+            </div>
+            <div class="overflow-x-auto rounded-2xl border border-slate-800/70">
+              <table class="playlist-table">
+                <thead>
+                  <tr>
+                    <th class="text-left">日期</th>
+                    <th class="text-left">星期</th>
+                    <th class="text-center">白班</th>
+                    <th class="text-center">中班</th>
+                  </tr>
+                </thead>
+                <tbody id="schedule-body"></tbody>
+              </table>
+            </div>
+            <p id="schedule-empty" class="text-sm text-slate-400 hidden">暂无排班记录，请调整筛选条件或通过自动排班快速生成。</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="fab" class="fab-shell">
+      <div id="fab-menu" class="fab-menu"></div>
+      <button id="fab-toggle" type="button" class="fab-button" aria-label="打开播单工具">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
+    </div>
+
+    <div id="cell-picker" class="playlist-picker hidden">
+      <header>选择人员</header>
+      <select id="picker-select"></select>
+      <div class="action-row">
+        <button type="button" id="picker-confirm" class="confirm">保存</button>
+        <button type="button" id="picker-clear" class="clear">清除</button>
+        <button type="button" id="picker-cancel" class="cancel">取消</button>
+      </div>
+    </div>
+
+    <div id="auto-modal" class="modal-overlay">
+      <div class="modal-surface">
+        <h2>自动化排班</h2>
+        <form id="auto-form" class="space-y-6">
+          <div class="form-grid">
+            <div>
+              <label for="auto-start">起始日期</label>
+              <input id="auto-start" name="start" type="date" required />
+            </div>
+            <div>
+              <label for="auto-end">结束日期</label>
+              <input id="auto-end" name="end" type="date" required />
+            </div>
+            <div>
+              <label for="auto-white">白班时长（天）</label>
+              <input id="auto-white" name="white_duration" type="number" min="1" value="1" required />
+            </div>
+            <div>
+              <label for="auto-mid">中班时长（天）</label>
+              <input id="auto-mid" name="mid_duration" type="number" min="1" value="1" required />
+            </div>
+            <div>
+              <label for="auto-max">平均时长最大差值（天）</label>
+              <input id="auto-max" name="max_diff" type="number" min="0" value="2" required />
+            </div>
+          </div>
+          <div>
+            <label>自动排班人员</label>
+            <div id="auto-emp-list" class="modal-emp-list space-y-1"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="auto-cancel" class="btn-secondary">取消</button>
+            <button type="submit" class="btn-primary">开始排班</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <input id="import-file" type="file" accept=".xlsx" class="hidden" />
+
+    <script>
+      const state = {
+        user: null,
+        teams: [],
+        teamId: App.getPreferredTeamId(),
+        start: '',
+        end: '',
+        days: [],
+        cells: {},
+        employees: [],
+        canEdit: false,
+        features: {
+          floatingBall: false,
+          importExport: false,
+          autoFill: false,
+        },
+      };
+
+      const elements = {
+        shell: document.getElementById('playlist-shell'),
+        denied: document.getElementById('access-denied'),
+        teamSelect: document.getElementById('team-select'),
+        startInput: document.getElementById('start-date'),
+        endInput: document.getElementById('end-date'),
+        applyBtn: document.getElementById('apply-range'),
+        refreshBtn: document.getElementById('refresh-btn'),
+        rangeInfo: document.getElementById('range-info'),
+        teamInfo: document.getElementById('team-info'),
+        userName: document.getElementById('user-name'),
+        tableBody: document.getElementById('schedule-body'),
+        tableEmpty: document.getElementById('schedule-empty'),
+        fabShell: document.getElementById('fab'),
+        fabMenu: document.getElementById('fab-menu'),
+        fabToggle: document.getElementById('fab-toggle'),
+        picker: document.getElementById('cell-picker'),
+        pickerSelect: document.getElementById('picker-select'),
+        pickerConfirm: document.getElementById('picker-confirm'),
+        pickerClear: document.getElementById('picker-clear'),
+        pickerCancel: document.getElementById('picker-cancel'),
+        autoModal: document.getElementById('auto-modal'),
+        autoForm: document.getElementById('auto-form'),
+        autoCancel: document.getElementById('auto-cancel'),
+        autoEmpList: document.getElementById('auto-emp-list'),
+        autoStart: document.getElementById('auto-start'),
+        autoEnd: document.getElementById('auto-end'),
+        autoWhite: document.getElementById('auto-white'),
+        autoMid: document.getElementById('auto-mid'),
+        autoMax: document.getElementById('auto-max'),
+        importInput: document.getElementById('import-file'),
+      };
+
+      function normalizeViewList(list) {
+        if (!Array.isArray(list)) {
+          return [];
+        }
+        return list.map((item) => String(item).toLowerCase());
+      }
+
+      function userCanAccessView(user, view) {
+        if (!view) return true;
+        if (!user) return false;
+        const normalizedView = String(view).toLowerCase();
+        if (normalizedView === 'home') {
+          return true;
+        }
+        if (normalizedView === 'admin' && String(user.role || '').toLowerCase() !== 'admin') {
+          return false;
+        }
+        const allowedViews = normalizeViewList(user.allowed_views);
+        if (allowedViews.includes('*')) {
+          return true;
+        }
+        return allowedViews.includes(normalizedView);
+      }
+
+      function refreshNavGroups() {
+        document.querySelectorAll('.nav-group').forEach((group) => {
+          const subLinks = group.querySelectorAll('.nav-secondary');
+          const hasVisibleSub = Array.from(subLinks).some((link) => !link.classList.contains('hidden'));
+          if (hasVisibleSub) {
+            group.classList.add('nav-group--with-sub');
+          } else {
+            group.classList.remove('nav-group--with-sub');
+          }
+        });
+      }
+
+      function applyViewVisibility(user) {
+        document.querySelectorAll('[data-view]').forEach((link) => {
+          const requiredView = link.dataset.view ? link.dataset.view.toLowerCase() : '';
+          if (!requiredView) {
+            return;
+          }
+          if (userCanAccessView(user, requiredView)) {
+            link.classList.remove('hidden');
+          } else {
+            link.classList.add('hidden');
+          }
+        });
+        refreshNavGroups();
+      }
+
+      function generateDays(start, end) {
+        if (!start || !end) {
+          return [];
+        }
+        const days = [];
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+          return [];
+        }
+        let current = startDate;
+        while (current <= endDate) {
+          days.push(current.toISOString().slice(0, 10));
+          current = new Date(current.getTime() + 86400000);
+        }
+        return days;
+      }
+
+      function weekdayLabel(day) {
+        const date = new Date(day);
+        if (Number.isNaN(date.getTime())) {
+          return '';
+        }
+        const map = ['日', '一', '二', '三', '四', '五', '六'];
+        return `星期${map[date.getDay()]}`;
+      }
+
+      function ensureCellsStructure() {
+        if (!state.cells || typeof state.cells !== 'object') {
+          state.cells = {};
+        }
+      }
+
+      function setCellData(day, shift, data) {
+        ensureCellsStructure();
+        if (!state.cells[day]) {
+          state.cells[day] = {};
+        }
+        if (data && typeof data === 'object') {
+          state.cells[day][shift] = data;
+        } else if (state.cells[day]) {
+          delete state.cells[day][shift];
+          if (Object.keys(state.cells[day]).length === 0) {
+            delete state.cells[day];
+          }
+        }
+      }
+
+      function replaceCellsInRange(start, end, newCells) {
+        const days = generateDays(start, end);
+        days.forEach((day) => {
+          if (state.cells[day]) {
+            delete state.cells[day];
+          }
+        });
+        if (newCells && typeof newCells === 'object') {
+          Object.entries(newCells).forEach(([day, shifts]) => {
+            state.cells[day] = shifts;
+          });
+        }
+      }
+
+      function renderRangeInfo() {
+        const rangeText = state.start && state.end ? `排班范围：${state.start} 至 ${state.end}` : '';
+        elements.rangeInfo.textContent = rangeText;
+        const team = state.teams.find((item) => Number(item.id) === Number(state.teamId));
+        elements.teamInfo.textContent = team ? `团队：${team.name}` : '暂无团队';
+      }
+
+      function renderTeamSelect() {
+        if (!elements.teamSelect) return;
+        elements.teamSelect.innerHTML = '';
+        if (!state.teams.length) {
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = '暂无团队';
+          elements.teamSelect.appendChild(option);
+          elements.teamSelect.disabled = true;
+          return;
+        }
+        elements.teamSelect.disabled = false;
+        state.teams.forEach((team) => {
+          const option = document.createElement('option');
+          option.value = String(team.id);
+          option.textContent = team.name || `团队 #${team.id}`;
+          if (Number(team.id) === Number(state.teamId)) {
+            option.selected = true;
+          }
+          elements.teamSelect.appendChild(option);
+        });
+      }
+
+      function renderTable() {
+        if (!elements.tableBody) return;
+        ensureCellsStructure();
+        const rows = [];
+        if (!state.days.length) {
+          elements.tableBody.innerHTML = '';
+          elements.tableEmpty.classList.remove('hidden');
+          return;
+        }
+        elements.tableEmpty.classList.add('hidden');
+        state.days.forEach((day) => {
+          const shifts = state.cells[day] || {};
+          const whiteCell = shifts.white || null;
+          const midCell = shifts.mid || null;
+          rows.push(`
+            <tr>
+              <td class="whitespace-nowrap text-slate-200">${day}</td>
+              <td class="text-slate-400">${weekdayLabel(day)}</td>
+              <td class="text-center">
+                ${renderCellButton(day, 'white', whiteCell)}
+              </td>
+              <td class="text-center">
+                ${renderCellButton(day, 'mid', midCell)}
+              </td>
+            </tr>
+          `);
+        });
+        elements.tableBody.innerHTML = rows.join('');
+      }
+
+      function renderCellButton(day, shift, cell) {
+        const hasValue = cell && cell.emp_display;
+        const classes = ['playlist-cell', `cell-${shift}`];
+        if (hasValue) {
+          classes.push('has-value');
+        }
+        if (!state.canEdit) {
+          classes.push('is-disabled');
+        }
+        const titleParts = [];
+        if (cell && cell.updated_at) {
+          titleParts.push(`更新：${cell.updated_at}`);
+        }
+        if (cell && cell.updated_by && cell.updated_by.display_name) {
+          titleParts.push(`操作人：${cell.updated_by.display_name}`);
+        }
+        const titleAttr = titleParts.length ? ` title="${titleParts.join(' / ')}"` : '';
+        const label = hasValue ? cell.emp_display : '未分配';
+        const attrs = state.canEdit ? `data-cell="1" data-day="${day}" data-shift="${shift}"` : '';
+        return `<button type="button" class="${classes.join(' ')}" ${attrs}${titleAttr}>${label}</button>`;
+      }
+
+      function populatePicker(day, shift) {
+        const shifts = state.cells[day] || {};
+        const current = shifts[shift] || null;
+        elements.pickerSelect.innerHTML = '';
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = '未分配';
+        elements.pickerSelect.appendChild(emptyOption);
+        state.employees.forEach((emp) => {
+          const option = document.createElement('option');
+          option.value = String(emp.id);
+          option.textContent = emp.display_name || emp.name || `#${emp.id}`;
+          if (current && Number(current.emp_id) === Number(emp.id)) {
+            option.selected = true;
+          }
+          elements.pickerSelect.appendChild(option);
+        });
+      }
+
+      function openPicker(day, shift, anchor) {
+        if (!state.canEdit) {
+          return;
+        }
+        populatePicker(day, shift);
+        elements.picker.dataset.day = day;
+        elements.picker.dataset.shift = shift;
+        const rect = anchor.getBoundingClientRect();
+        const top = window.scrollY + rect.bottom + 8;
+        let left = window.scrollX + rect.left;
+        const pickerWidth = 260;
+        const maxLeft = window.scrollX + window.innerWidth - pickerWidth - 16;
+        if (left > maxLeft) {
+          left = maxLeft;
+        }
+        elements.picker.style.top = `${top}px`;
+        elements.picker.style.left = `${left}px`;
+        elements.picker.classList.remove('hidden');
+      }
+
+      function closePicker() {
+        elements.picker.classList.add('hidden');
+        delete elements.picker.dataset.day;
+        delete elements.picker.dataset.shift;
+      }
+
+      async function updateCell(day, shift, empId) {
+        if (!state.teamId) {
+          App.toast('请选择团队', { type: 'error' });
+          return;
+        }
+        const shifts = state.cells[day] || {};
+        const current = shifts[shift] || null;
+        const payload = {
+          action: 'update_cell',
+          team_id: state.teamId,
+          day,
+          shift,
+          emp_id: empId,
+          client_version: current ? current.version || 0 : 0,
+        };
+        try {
+          App.showLoading('正在保存…');
+          const result = await apiPost('/api/playlist_schedule.php', payload);
+          if (result && result.cell) {
+            setCellData(day, shift, result.cell);
+          } else {
+            setCellData(day, shift, null);
+          }
+          renderTable();
+          const selector = `button[data-day="${day}"][data-shift="${shift}"]`;
+          const target = elements.tableBody.querySelector(selector);
+          App.flash(target);
+          App.toast('排班已更新', { type: 'success' });
+        } catch (error) {
+          App.toast(error.message || '保存失败', { type: 'error' });
+        } finally {
+          App.hideLoading();
+        }
+      }
+
+      async function apiGet(url) {
+        const response = await fetch(url, { credentials: 'include' });
+        if (response.status === 401) {
+          window.location.href = './login.html';
+          throw new Error('UNAUTHENTICATED');
+        }
+        if (response.status === 403) {
+          throw new Error('FORBIDDEN');
+        }
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data || data.ok !== true) {
+          const message = data && (data.error || data.msg);
+          throw new Error(message || '请求失败');
+        }
+        return data;
+      }
+
+      async function apiPost(url, body) {
+        const response = await fetch(url, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        });
+        if (response.status === 401) {
+          window.location.href = './login.html';
+          throw new Error('UNAUTHENTICATED');
+        }
+        if (response.status === 403) {
+          throw new Error('FORBIDDEN');
+        }
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data || data.ok !== true) {
+          const message = data && (data.error || data.msg);
+          throw new Error(message || '操作失败');
+        }
+        return data;
+      }
+
+      async function loadScheduleData(force = false) {
+        if (!userCanAccessView(state.user, 'playlistschedule')) {
+          elements.shell.classList.add('hidden');
+          elements.denied.classList.remove('hidden');
+          return;
+        }
+        const params = new URLSearchParams();
+        if (state.teamId) {
+          params.set('team_id', String(state.teamId));
+        }
+        const startValue = elements.startInput.value ? elements.startInput.value.trim() : '';
+        const endValue = elements.endInput.value ? elements.endInput.value.trim() : '';
+        if (startValue) {
+          params.set('start', startValue);
+        }
+        if (endValue) {
+          params.set('end', endValue);
+        }
+        if (!force && state.start === startValue && state.end === endValue && state.teamId) {
+          renderTable();
+          renderRangeInfo();
+          renderTeamSelect();
+          updateFloatingBall();
+          elements.shell.classList.remove('hidden');
+          elements.denied.classList.add('hidden');
+          return;
+        }
+        try {
+          App.showLoading('正在加载播单排班…');
+          const data = await apiGet(`/api/playlist_schedule.php?${params.toString()}`);
+          state.teams = Array.isArray(data.teams) ? data.teams : [];
+          state.teamId = data.team_id || null;
+          state.start = data.start || '';
+          state.end = data.end || '';
+          state.employees = Array.isArray(data.employees) ? data.employees : [];
+          state.cells = data.cells && typeof data.cells === 'object' ? data.cells : {};
+          state.canEdit = Boolean(data.can_edit);
+          state.features = data.features || state.features;
+          if (data.user) {
+            state.user = data.user;
+            elements.userName.textContent = data.user.display_name || data.user.username || '';
+            applyViewVisibility(state.user);
+          }
+          state.days = generateDays(state.start, state.end);
+          if (state.teamId) {
+            App.setPreferredTeamId(state.teamId);
+          }
+          renderTeamSelect();
+          elements.startInput.value = state.start;
+          elements.endInput.value = state.end;
+          renderRangeInfo();
+          renderTable();
+          updateFloatingBall();
+          renderAutoEmployeeList();
+          elements.shell.classList.remove('hidden');
+          elements.denied.classList.add('hidden');
+        } catch (error) {
+          App.toast(error.message || '加载失败', { type: 'error' });
+        } finally {
+          App.hideLoading();
+        }
+      }
+
+      function updateFloatingBall() {
+        if (!elements.fabShell) return;
+        const enabled = state.features && state.features.floatingBall && state.canEdit;
+        if (enabled) {
+          elements.fabShell.classList.add('show');
+          buildFabMenu();
+        } else {
+          elements.fabShell.classList.remove('show');
+          elements.fabShell.classList.remove('open');
+        }
+      }
+
+      function buildFabMenu() {
+        if (!elements.fabMenu) return;
+        const buttons = [];
+        if (state.features.autoFill) {
+          buttons.push({ key: 'auto', label: '自动化排班' });
+        }
+        if (state.features.importExport) {
+          buttons.push({ key: 'import', label: '导入 Excel' });
+          buttons.push({ key: 'export', label: '导出 Excel' });
+          buttons.push({ key: 'template', label: '下载模板' });
+        }
+        elements.fabMenu.innerHTML = buttons
+          .map((btn) => `<button type="button" data-fab="${btn.key}">${btn.label}</button>`)
+          .join('');
+      }
+
+      function renderAutoEmployeeList() {
+        if (!elements.autoEmpList) return;
+        if (!state.employees.length) {
+          elements.autoEmpList.innerHTML = '<p class="text-sm text-slate-400">暂无团队成员，请先在人员管理中维护。</p>';
+          return;
+        }
+        elements.autoEmpList.innerHTML = state.employees
+          .map((emp) => {
+            const label = emp.display_name || emp.name || `成员 #${emp.id}`;
+            return `
+              <label class="modal-emp-item">
+                <input type="checkbox" value="${emp.id}" class="w-4 h-4 rounded border-slate-700 bg-slate-900" />
+                <span>${label}</span>
+              </label>
+            `;
+          })
+          .join('');
+      }
+
+      function openAutoModal() {
+        if (!elements.autoModal) return;
+        elements.autoStart.value = state.start || '';
+        elements.autoEnd.value = state.end || '';
+        elements.autoModal.classList.add('show');
+      }
+
+      function closeAutoModal() {
+        if (!elements.autoModal) return;
+        elements.autoModal.classList.remove('show');
+      }
+
+      async function submitAutoSchedule(event) {
+        event.preventDefault();
+        if (!state.teamId) {
+          App.toast('请选择团队', { type: 'error' });
+          return;
+        }
+        const formData = new FormData(elements.autoForm);
+        const start = (formData.get('start') || '').toString();
+        const end = (formData.get('end') || '').toString();
+        const whiteDuration = Number(formData.get('white_duration') || 1);
+        const midDuration = Number(formData.get('mid_duration') || 1);
+        const maxDiff = Number(formData.get('max_diff') || 0);
+        const empIds = Array.from(elements.autoEmpList.querySelectorAll('input[type="checkbox"]:checked')).map((input) =>
+          Number(input.value)
+        );
+        if (!empIds.length) {
+          App.toast('请选择自动排班的人员', { type: 'error' });
+          return;
+        }
+        const payload = {
+          action: 'auto_fill',
+          team_id: state.teamId,
+          start,
+          end,
+          white_duration: whiteDuration,
+          mid_duration: midDuration,
+          max_diff: maxDiff,
+          emp_ids: empIds,
+        };
+        try {
+          App.showLoading('正在自动排班…');
+          const result = await apiPost('/api/playlist_schedule.php', payload);
+          if (result && result.cells) {
+            replaceCellsInRange(start, end, result.cells);
+            state.start = start;
+            state.end = end;
+            state.days = generateDays(state.start, state.end);
+            elements.startInput.value = state.start;
+            elements.endInput.value = state.end;
+            renderRangeInfo();
+            renderTable();
+            App.toast('自动排班完成', { type: 'success' });
+          }
+        } catch (error) {
+          App.toast(error.message || '自动排班失败', { type: 'error' });
+        } finally {
+          App.hideLoading();
+          closeAutoModal();
+        }
+      }
+
+      async function handleImport(file) {
+        if (!file || !state.teamId) {
+          return;
+        }
+        const formData = new FormData();
+        formData.append('action', 'import');
+        formData.append('team_id', String(state.teamId));
+        formData.append('file', file);
+        try {
+          App.showLoading('正在导入…');
+          const response = await fetch('/api/playlist_schedule.php', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          });
+          if (response.status === 401) {
+            window.location.href = './login.html';
+            return;
+          }
+          if (response.status === 403) {
+            App.toast('无权执行导入', { type: 'error' });
+            return;
+          }
+          const data = await response.json().catch(() => null);
+          if (!response.ok || !data || data.ok !== true) {
+            const message = data && (data.error || data.msg);
+            throw new Error(message || '导入失败');
+          }
+          if (data.cells) {
+            const start = data.start || state.start;
+            const end = data.end || state.end;
+            replaceCellsInRange(start, end, data.cells);
+            state.start = start;
+            state.end = end;
+            state.days = generateDays(state.start, state.end);
+            elements.startInput.value = state.start;
+            elements.endInput.value = state.end;
+            renderRangeInfo();
+            renderTable();
+          }
+          App.toast('导入完成', { type: 'success' });
+        } catch (error) {
+          App.toast(error.message || '导入失败', { type: 'error' });
+        } finally {
+          App.hideLoading();
+          elements.importInput.value = '';
+        }
+      }
+
+      function initEventListeners() {
+        if (elements.teamSelect) {
+          elements.teamSelect.addEventListener('change', () => {
+            const value = elements.teamSelect.value ? Number(elements.teamSelect.value) : null;
+            if (value && value !== state.teamId) {
+              state.teamId = value;
+              App.setPreferredTeamId(state.teamId);
+              loadScheduleData(true);
+            }
+          });
+        }
+
+        if (elements.applyBtn) {
+          elements.applyBtn.addEventListener('click', () => {
+            state.start = elements.startInput.value ? elements.startInput.value.trim() : '';
+            state.end = elements.endInput.value ? elements.endInput.value.trim() : '';
+            state.days = generateDays(state.start, state.end);
+            loadScheduleData(true);
+          });
+        }
+
+        if (elements.refreshBtn) {
+          elements.refreshBtn.addEventListener('click', () => {
+            loadScheduleData(true);
+          });
+        }
+
+        if (elements.tableBody) {
+          elements.tableBody.addEventListener('click', (event) => {
+            const target = event.target.closest('button[data-cell="1"]');
+            if (!target) {
+              return;
+            }
+            const day = target.dataset.day;
+            const shift = target.dataset.shift;
+            openPicker(day, shift, target);
+          });
+        }
+
+        document.addEventListener('click', (event) => {
+          if (!elements.picker.classList.contains('hidden')) {
+            const within = event.target === elements.picker || elements.picker.contains(event.target);
+            if (!within) {
+              closePicker();
+            }
+          }
+        });
+
+        elements.pickerConfirm.addEventListener('click', () => {
+          const day = elements.picker.dataset.day;
+          const shift = elements.picker.dataset.shift;
+          const empId = Number(elements.pickerSelect.value || 0);
+          closePicker();
+          updateCell(day, shift, empId);
+        });
+
+        elements.pickerClear.addEventListener('click', () => {
+          const day = elements.picker.dataset.day;
+          const shift = elements.picker.dataset.shift;
+          closePicker();
+          updateCell(day, shift, 0);
+        });
+
+        elements.pickerCancel.addEventListener('click', () => {
+          closePicker();
+        });
+
+        if (elements.fabToggle) {
+          elements.fabToggle.addEventListener('click', () => {
+            if (!state.features.floatingBall) return;
+            elements.fabShell.classList.toggle('open');
+          });
+        }
+
+        if (elements.fabMenu) {
+          elements.fabMenu.addEventListener('click', (event) => {
+            const btn = event.target.closest('button[data-fab]');
+            if (!btn) return;
+            const action = btn.dataset.fab;
+            elements.fabShell.classList.remove('open');
+            switch (action) {
+              case 'auto':
+                if (state.features.autoFill) {
+                  openAutoModal();
+                } else {
+                  App.toast('未启用自动排班权限', { type: 'error' });
+                }
+                break;
+              case 'import':
+                if (state.features.importExport) {
+                  elements.importInput.click();
+                } else {
+                  App.toast('未启用导入权限', { type: 'error' });
+                }
+                break;
+              case 'export':
+                if (state.features.importExport) {
+                  triggerExport();
+                } else {
+                  App.toast('未启用导出权限', { type: 'error' });
+                }
+                break;
+              case 'template':
+                window.open('/api/playlist_schedule.php?action=template', '_blank');
+                break;
+              default:
+                break;
+            }
+          });
+        }
+
+        if (elements.autoCancel) {
+          elements.autoCancel.addEventListener('click', () => {
+            closeAutoModal();
+          });
+        }
+
+        if (elements.autoForm) {
+          elements.autoForm.addEventListener('submit', submitAutoSchedule);
+        }
+
+        if (elements.importInput) {
+          elements.importInput.addEventListener('change', (event) => {
+            const file = event.target.files && event.target.files[0];
+            if (file) {
+              handleImport(file);
+            }
+          });
+        }
+
+        App.on('team:change', (event) => {
+          const detail = event && typeof event === 'object' ? event.detail : null;
+          const nextId = detail && Number.isFinite(detail.teamId) ? detail.teamId : null;
+          if (nextId && nextId !== state.teamId) {
+            state.teamId = nextId;
+            renderTeamSelect();
+            loadScheduleData(true);
+          }
+        });
+      }
+
+      function triggerExport() {
+        if (!state.teamId) {
+          App.toast('请选择团队', { type: 'error' });
+          return;
+        }
+        const params = new URLSearchParams();
+        params.set('action', 'export');
+        params.set('team_id', String(state.teamId));
+        const startValue = elements.startInput.value ? elements.startInput.value.trim() : '';
+        const endValue = elements.endInput.value ? elements.endInput.value.trim() : '';
+        if (startValue) params.set('start', startValue);
+        if (endValue) params.set('end', endValue);
+        window.open(`/api/playlist_schedule.php?${params.toString()}`, '_blank');
+      }
+
+      async function ensureLoggedIn() {
+        try {
+          const data = await apiGet('/api/auth.php?action=me');
+          state.user = data.user;
+          elements.userName.textContent = data.user.display_name || data.user.username || '';
+          applyViewVisibility(state.user);
+          if (!userCanAccessView(state.user, 'playlistschedule')) {
+            elements.shell.classList.add('hidden');
+            elements.denied.classList.remove('hidden');
+            return false;
+          }
+          return true;
+        } catch (error) {
+          if (error.message === 'UNAUTHENTICATED') {
+            return false;
+          }
+          if (error.message === 'FORBIDDEN') {
+            elements.shell.classList.add('hidden');
+            elements.denied.classList.remove('hidden');
+            return false;
+          }
+          App.toast(error.message || '加载失败', { type: 'error' });
+          return false;
+        }
+      }
+
+      App.ready(async () => {
+        App.initSidebar({ activeView: 'playlistschedule' });
+        initEventListeners();
+        const allowed = await ensureLoggedIn();
+        if (!allowed) {
+          return;
+        }
+        await loadScheduleData(true);
+      });
+    </script>
+  </body>
+</html>

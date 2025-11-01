@@ -139,6 +139,33 @@ body.sidebar-open .app-sidebar {
   background: rgba(56, 189, 248, 0.85);
 }
 
+.app-sidebar nav .nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.app-sidebar nav .nav-group .nav-primary {
+  position: relative;
+}
+
+.app-sidebar nav .nav-group .nav-secondary {
+  display: none;
+  font-size: 0.9rem;
+  opacity: 0.68;
+  padding-left: 2.75rem;
+}
+
+.app-sidebar nav .nav-group.nav-group--with-sub:hover .nav-secondary,
+.app-sidebar nav .nav-group.nav-group--with-sub:focus-within .nav-secondary {
+  display: flex;
+}
+
+.app-sidebar nav .nav-group .nav-secondary.is-active {
+  display: flex;
+  opacity: 1;
+}
+
 .sidebar-meta {
   margin-top: auto;
   padding-top: 1.75rem;
