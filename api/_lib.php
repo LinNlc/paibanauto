@@ -62,7 +62,31 @@ function ensure_schema_up_to_date(PDO $pdo): void
     ensure_table_column($pdo, 'users', 'features_json', "ALTER TABLE users ADD COLUMN features_json TEXT DEFAULT '{}'");
     ensure_table_column($pdo, 'users', 'disabled', "ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0");
 
+    ensure_playlist_schedule_tables($pdo);
+
     $applied = true;
+}
+
+function ensure_playlist_schedule_tables(PDO $pdo): void
+{
+    $pdo->exec('CREATE TABLE IF NOT EXISTS playlist_schedule_cells (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        team_id INTEGER NOT NULL,
+        day TEXT NOT NULL,
+        shift TEXT NOT NULL,
+        emp_id INTEGER,
+        emp_name TEXT NOT NULL DEFAULT \'\',
+        version INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER,
+        FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+        FOREIGN KEY (emp_id) REFERENCES employees(id) ON DELETE SET NULL,
+        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
+        UNIQUE(team_id, day, shift)
+    )');
+
+    $pdo->exec('CREATE INDEX IF NOT EXISTS idx_playlist_schedule_cells_team_day ON playlist_schedule_cells (team_id, day)');
+    $pdo->exec('CREATE INDEX IF NOT EXISTS idx_playlist_schedule_cells_emp ON playlist_schedule_cells (emp_id)');
 }
 
 function ensure_table_column(PDO $pdo, string $table, string $column, string $ddl): void
@@ -400,6 +424,9 @@ function normalize_feature_flags($value): array
         'scheduleImportExport' => false,
         'scheduleAssistSettings' => false,
         'scheduleAi' => false,
+        'playlistFloatingBall' => false,
+        'playlistImportExport' => false,
+        'playlistAutoFill' => false,
     ];
 
     if (!is_array($value)) {
@@ -427,6 +454,234 @@ function schedule_assist_color_options(): array
 function schedule_summary_color_options(): array
 {
     return ['emerald', 'sky', 'amber', 'rose', 'slate'];
+}
+
+function playlist_shift_types(): array
+{
+    return ['white', 'mid'];
+}
+
+function normalize_playlist_shift(string $value): ?string
+{
+    $normalized = strtolower(trim($value));
+    $allowed = playlist_shift_types();
+
+    return in_array($normalized, $allowed, true) ? $normalized : null;
+}
+
+function playlist_shift_label(string $shift): string
+{
+    switch ($shift) {
+        case 'white':
+            return '白班';
+        case 'mid':
+            return '中班';
+        default:
+            return $shift;
+    }
+}
+
+function playlist_fetch_cells(PDO $pdo, int $teamId, string $startDate, string $endDate): array
+{
+    $stmt = $pdo->prepare('SELECT c.id, c.day, c.shift, c.emp_id, c.emp_name, c.version, c.updated_at, c.updated_by,
+        u.display_name AS updater_display, u.username AS updater_username,
+        e.name AS employee_name, e.display_name AS employee_display
+        FROM playlist_schedule_cells c
+        LEFT JOIN users u ON c.updated_by = u.id
+        LEFT JOIN employees e ON c.emp_id = e.id
+        WHERE c.team_id = :team AND c.day >= :start AND c.day <= :end
+        ORDER BY c.day ASC, c.shift ASC');
+    $stmt->execute([
+        ':team' => $teamId,
+        ':start' => $startDate,
+        ':end' => $endDate,
+    ]);
+
+    $rows = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $empId = $row['emp_id'] !== null ? (int) $row['emp_id'] : null;
+        $empDisplay = '';
+        if ($row['employee_display'] !== null && trim((string) $row['employee_display']) !== '') {
+            $empDisplay = (string) $row['employee_display'];
+        } elseif ($row['employee_name'] !== null && trim((string) $row['employee_name']) !== '') {
+            $empDisplay = (string) $row['employee_name'];
+        } else {
+            $empDisplay = (string) ($row['emp_name'] ?? '');
+        }
+
+        $updaterName = '';
+        if ($row['updater_display'] !== null && trim((string) $row['updater_display']) !== '') {
+            $updaterName = (string) $row['updater_display'];
+        } elseif ($row['updater_username'] !== null) {
+            $updaterName = (string) $row['updater_username'];
+        }
+
+        $rows[] = [
+            'id' => (int) $row['id'],
+            'day' => (string) $row['day'],
+            'shift' => (string) $row['shift'],
+            'emp_id' => $empId,
+            'emp_name' => (string) ($row['emp_name'] ?? ''),
+            'emp_display' => $empDisplay,
+            'version' => (int) $row['version'],
+            'updated_at' => (string) $row['updated_at'],
+            'updated_by' => $row['updated_by'] !== null ? [
+                'id' => (int) $row['updated_by'],
+                'display_name' => $updaterName,
+            ] : null,
+        ];
+    }
+
+    return $rows;
+}
+
+function playlist_find_cell(PDO $pdo, int $teamId, string $day, string $shift): ?array
+{
+    $stmt = $pdo->prepare('SELECT id, emp_id, emp_name, version FROM playlist_schedule_cells WHERE team_id = :team AND day = :day AND shift = :shift LIMIT 1');
+    $stmt->execute([
+        ':team' => $teamId,
+        ':day' => $day,
+        ':shift' => $shift,
+    ]);
+
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return null;
+    }
+
+    return [
+        'id' => (int) $row['id'],
+        'emp_id' => $row['emp_id'] !== null ? (int) $row['emp_id'] : null,
+        'emp_name' => (string) ($row['emp_name'] ?? ''),
+        'version' => (int) $row['version'],
+    ];
+}
+
+function playlist_store_cell(
+    PDO $pdo,
+    int $teamId,
+    string $day,
+    string $shift,
+    ?int $employeeId,
+    string $employeeName,
+    int $userId,
+    int $clientVersion = 0,
+    bool $force = false
+): array {
+    $timestamp = date('Y-m-d H:i:s');
+    $existing = playlist_find_cell($pdo, $teamId, $day, $shift);
+
+    if ($existing === null) {
+        if ($employeeId === null && $employeeName === '') {
+            return [
+                'changed' => false,
+                'version' => 0,
+            ];
+        }
+
+        $stmt = $pdo->prepare('INSERT INTO playlist_schedule_cells (team_id, day, shift, emp_id, emp_name, version, updated_at, updated_by)
+            VALUES (:team, :day, :shift, :emp_id, :emp_name, 1, :updated_at, :updated_by)');
+        $stmt->bindValue(':team', $teamId, PDO::PARAM_INT);
+        $stmt->bindValue(':day', $day, PDO::PARAM_STR);
+        $stmt->bindValue(':shift', $shift, PDO::PARAM_STR);
+        if ($employeeId !== null) {
+            $stmt->bindValue(':emp_id', $employeeId, PDO::PARAM_INT);
+        } else {
+            $stmt->bindValue(':emp_id', null, PDO::PARAM_NULL);
+        }
+        $stmt->bindValue(':emp_name', $employeeName, PDO::PARAM_STR);
+        $stmt->bindValue(':updated_at', $timestamp, PDO::PARAM_STR);
+        if ($userId > 0) {
+            $stmt->bindValue(':updated_by', $userId, PDO::PARAM_INT);
+        } else {
+            $stmt->bindValue(':updated_by', null, PDO::PARAM_NULL);
+        }
+        $stmt->execute();
+
+        return [
+            'changed' => true,
+            'version' => 1,
+            'updated_at' => $timestamp,
+        ];
+    }
+
+    $currentVersion = (int) $existing['version'];
+    if (!$force && $clientVersion > 0 && $clientVersion < $currentVersion) {
+        json_err('存在更新冲突', 409, [
+            'conflict' => true,
+            'current_version' => $currentVersion,
+        ]);
+    }
+
+    $newVersion = $currentVersion + 1;
+    $stmt = $pdo->prepare('UPDATE playlist_schedule_cells SET emp_id = :emp_id, emp_name = :emp_name, version = :version, updated_at = :updated_at, updated_by = :updated_by WHERE id = :id');
+    if ($employeeId !== null) {
+        $stmt->bindValue(':emp_id', $employeeId, PDO::PARAM_INT);
+    } else {
+        $stmt->bindValue(':emp_id', null, PDO::PARAM_NULL);
+    }
+    $stmt->bindValue(':emp_name', $employeeName, PDO::PARAM_STR);
+    $stmt->bindValue(':version', $newVersion, PDO::PARAM_INT);
+    $stmt->bindValue(':updated_at', $timestamp, PDO::PARAM_STR);
+    if ($userId > 0) {
+        $stmt->bindValue(':updated_by', $userId, PDO::PARAM_INT);
+    } else {
+        $stmt->bindValue(':updated_by', null, PDO::PARAM_NULL);
+    }
+    $stmt->bindValue(':id', (int) $existing['id'], PDO::PARAM_INT);
+    $stmt->execute();
+
+    return [
+        'changed' => true,
+        'version' => $newVersion,
+        'updated_at' => $timestamp,
+    ];
+}
+
+function playlist_clear_cell(PDO $pdo, int $teamId, string $day, string $shift, int $userId, int $clientVersion = 0): array
+{
+    return playlist_store_cell($pdo, $teamId, $day, $shift, null, '', $userId, $clientVersion);
+}
+
+function playlist_employee_map(PDO $pdo, int $teamId): array
+{
+    $employees = fetch_team_employees($pdo, $teamId);
+    $map = [];
+    foreach ($employees as $emp) {
+        $label = (string) ($emp['display_name'] ?? '');
+        if ($label === '') {
+            $label = (string) ($emp['name'] ?? '');
+        }
+        $map[(int) $emp['id']] = [
+            'id' => (int) $emp['id'],
+            'name' => (string) ($emp['name'] ?? ''),
+            'display_name' => (string) ($emp['display_name'] ?? ''),
+            'label' => $label,
+            'active' => isset($emp['active']) ? (bool) $emp['active'] : true,
+        ];
+    }
+
+    return $map;
+}
+
+function fetch_team_employees(PDO $pdo, int $teamId): array
+{
+    $stmt = $pdo->prepare('SELECT id, name, display_name, active, sort_order FROM employees WHERE team_id = :team ORDER BY sort_order ASC, id ASC');
+    $stmt->execute([':team' => $teamId]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $result = [];
+    foreach ($rows as $row) {
+        $result[] = [
+            'id' => (int) $row['id'],
+            'name' => (string) $row['name'],
+            'display_name' => (string) $row['display_name'],
+            'active' => (int) $row['active'] === 1,
+            'sort_order' => (int) $row['sort_order'],
+        ];
+    }
+
+    return $result;
 }
 
 function schedule_assist_default_settings(): array

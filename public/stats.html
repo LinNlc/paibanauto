@@ -8,8 +8,31 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="./app.css?v=20240605" />
-    <script src="./app.js?v=20240605"></script>
+    <link rel="stylesheet" href="./app.css?v=20240610" />
+    <script src="./app.js?v=20240610"></script>
+    <style>
+      .view-toggle {
+        padding: 0.5rem 1.25rem;
+        border-radius: 0.9rem;
+        border: 1px solid transparent;
+        background: transparent;
+        color: rgba(226, 232, 240, 0.65);
+        font-size: 0.9rem;
+        transition: background 0.18s ease, border 0.18s ease, color 0.18s ease;
+      }
+
+      .view-toggle:hover {
+        border-color: rgba(148, 163, 184, 0.35);
+        background: rgba(148, 163, 184, 0.1);
+        color: rgba(226, 232, 240, 0.9);
+      }
+
+      .view-toggle.is-active {
+        border-color: rgba(56, 189, 248, 0.35);
+        background: rgba(56, 189, 248, 0.12);
+        color: rgba(226, 232, 240, 0.95);
+      }
+    </style>
   </head>
   <body>
     <button type="button" class="app-sidebar-toggle" data-sidebar-toggle aria-label="展开菜单">
@@ -24,7 +47,17 @@
           <nav>
             <a href="./index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
             <a href="./people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
-            <a href="./schedule.html" data-view="schedule"><span class="nav-indicator"></span>排班表</a>
+            <div class="nav-group" data-nav-group="schedule">
+              <a href="./schedule.html" data-view="schedule" class="nav-primary"><span class="nav-indicator"></span>排班表</a>
+              <a
+                href="./playlist-schedule.html"
+                data-view="playlistschedule"
+                class="nav-secondary hidden"
+                data-subview="schedule"
+              >
+                <span class="nav-indicator"></span>播单专辑排班
+              </a>
+            </div>
             <a href="./stats.html" data-view="stats" class="is-active"><span class="nav-indicator"></span>数据统计</a>
             <a href="./admin.html" data-view="admin"><span class="nav-indicator"></span>权限设置</a>
           </nav>
@@ -94,7 +127,12 @@
           </div>
         </header>
 
-        <section class="bg-slate-900/60 border border-slate-800/60 rounded-3xl p-6 shadow-2xl space-y-6">
+        <div class="flex flex-wrap gap-3 text-sm">
+          <button id="view-schedule-btn" type="button" class="view-toggle is-active">排班统计</button>
+          <button id="view-playlist-btn" type="button" class="view-toggle hidden">播单专辑排班</button>
+        </div>
+
+        <section id="schedule-container" class="bg-slate-900/60 border border-slate-800/60 rounded-3xl p-6 shadow-2xl space-y-6">
           <div class="flex flex-wrap gap-3">
             <button
               id="tab-person"
@@ -173,6 +211,51 @@
             <p id="coverage-empty" class="text-sm text-slate-500 hidden">暂无在岗数据。</p>
           </div>
         </section>
+
+        <section id="playlist-container" class="space-y-6 hidden">
+          <div class="bg-slate-900/60 border border-slate-800/60 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-100">人员排班统计</h2>
+              <p class="text-sm text-slate-400">统计区间内各成员在播单白班与中班的排班次数。</p>
+            </div>
+            <div class="overflow-x-auto rounded-2xl border border-slate-800/70">
+              <table class="min-w-full divide-y divide-slate-800/80">
+                <thead class="text-xs uppercase tracking-wider text-slate-400">
+                  <tr>
+                    <th class="px-4 py-3 text-left">姓名</th>
+                    <th class="px-4 py-3 text-right">白班</th>
+                    <th class="px-4 py-3 text-right">中班</th>
+                    <th class="px-4 py-3 text-right">总计</th>
+                  </tr>
+                </thead>
+                <tbody id="playlist-person-body" class="divide-y divide-slate-800/60"></tbody>
+              </table>
+            </div>
+            <p id="playlist-person-empty" class="text-sm text-slate-500 hidden">暂无播单排班记录。</p>
+          </div>
+
+          <div class="bg-slate-900/60 border border-slate-800/60 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-100">每日排班分布</h2>
+              <p class="text-sm text-slate-400">查看每日白班与中班的排班情况。</p>
+            </div>
+            <div class="overflow-x-auto rounded-2xl border border-slate-800/70">
+              <table class="min-w-full divide-y divide-slate-800/80">
+                <thead class="text-xs uppercase tracking-wider text-slate-400">
+                  <tr>
+                    <th class="px-4 py-3 text-left">日期</th>
+                    <th class="px-4 py-3 text-left">星期</th>
+                    <th class="px-4 py-3 text-right">白班</th>
+                    <th class="px-4 py-3 text-right">中班</th>
+                    <th class="px-4 py-3 text-right">总计</th>
+                  </tr>
+                </thead>
+                <tbody id="playlist-daily-body" class="divide-y divide-slate-800/60"></tbody>
+              </table>
+            </div>
+            <p id="playlist-daily-empty" class="text-sm text-slate-500 hidden">暂无播单每日排班记录。</p>
+          </div>
+        </section>
       </main>
     </div>
 
@@ -190,8 +273,13 @@
         personRecords: [],
         coverageDaily: [],
         activeTab: 'person',
+        activeView: 'schedule',
+        hasPlaylistAccess: false,
+        playlistRecords: [],
+        playlistDaily: [],
         chartData: null,
         coverageKey: '',
+        playlistKey: '',
         isLoading: false,
       };
 
@@ -226,6 +314,18 @@
         return allowedViews.includes(normalizedView);
       }
 
+      function refreshNavGroups() {
+        document.querySelectorAll('.nav-group').forEach((group) => {
+          const subLinks = group.querySelectorAll('.nav-secondary');
+          const hasVisibleSub = Array.from(subLinks).some((link) => !link.classList.contains('hidden'));
+          if (hasVisibleSub) {
+            group.classList.add('nav-group--with-sub');
+          } else {
+            group.classList.remove('nav-group--with-sub');
+          }
+        });
+      }
+
       function applyViewVisibility(user) {
         document.querySelectorAll('[data-view]').forEach((link) => {
           const requiredView = link.dataset.view ? link.dataset.view.toLowerCase() : '';
@@ -238,6 +338,7 @@
             link.classList.add('hidden');
           }
         });
+        refreshNavGroups();
       }
 
       const teamNameDisplay = document.getElementById('team-name');
@@ -255,10 +356,41 @@
       const tabCoverage = document.getElementById('tab-coverage');
       const personContainer = document.getElementById('person-container');
       const coverageContainer = document.getElementById('coverage-container');
+      const viewScheduleBtn = document.getElementById('view-schedule-btn');
+      const viewPlaylistBtn = document.getElementById('view-playlist-btn');
+      const scheduleContainer = document.getElementById('schedule-container');
+      const playlistContainer = document.getElementById('playlist-container');
+      const playlistPersonBody = document.getElementById('playlist-person-body');
+      const playlistPersonEmpty = document.getElementById('playlist-person-empty');
+      const playlistDailyBody = document.getElementById('playlist-daily-body');
+      const playlistDailyEmpty = document.getElementById('playlist-daily-empty');
 
 
       tabPerson.addEventListener('click', () => switchTab('person'));
       tabCoverage.addEventListener('click', () => switchTab('coverage'));
+
+      if (viewScheduleBtn) {
+        viewScheduleBtn.addEventListener('click', () => {
+          if (state.activeView !== 'schedule') {
+            state.activeView = 'schedule';
+            renderActiveView();
+          }
+        });
+      }
+
+      if (viewPlaylistBtn) {
+        viewPlaylistBtn.addEventListener('click', () => {
+          if (!state.hasPlaylistAccess) {
+            App.toast('未开通播单统计权限', { type: 'error' });
+            return;
+          }
+          if (state.activeView !== 'playlist') {
+            state.activeView = 'playlist';
+            renderActiveView();
+            loadPlaylistStats();
+          }
+        });
+      }
 
       document.getElementById('apply-range').addEventListener('click', () => {
         loadPersonStats(true);
@@ -305,6 +437,19 @@
           state.user = data.user;
           document.getElementById('user-name').textContent = data.user.display_name || '';
           applyViewVisibility(state.user);
+          const allowedViews = normalizeViewList(state.user.allowed_views);
+          state.hasPlaylistAccess = allowedViews.includes('*') || allowedViews.includes('playlistschedule');
+          if (viewPlaylistBtn) {
+            if (state.hasPlaylistAccess) {
+              viewPlaylistBtn.classList.remove('hidden');
+            } else {
+              viewPlaylistBtn.classList.add('hidden');
+              if (state.activeView === 'playlist') {
+                state.activeView = 'schedule';
+              }
+            }
+          }
+          renderActiveView();
           if (!userCanAccessView(state.user, CURRENT_VIEW)) {
             App.toast('无权访问该视图');
             setTimeout(() => {
@@ -380,16 +525,28 @@
           updateTeamDisplay();
           renderInfo();
           renderPersonTable();
-          state.coverageKey = '';
-          if (state.activeTab === 'coverage') {
-            await loadCoverageStats(true);
-          }
         } catch (error) {
           App.toast('网络异常，请稍后再试');
         } finally {
           state.isLoading = false;
           App.hideLoading();
         }
+
+        if (state.hasPlaylistAccess) {
+          await loadPlaylistStats(true);
+        } else {
+          state.playlistRecords = [];
+          state.playlistDaily = [];
+          renderPlaylist();
+        }
+
+        if (state.activeTab === 'coverage') {
+          await loadCoverageStats(true);
+        } else {
+          loadCoverageStats(true);
+        }
+
+        renderActiveView();
       }
 
       async function loadCoverageStats(force = false) {
@@ -405,7 +562,10 @@
           renderCoverage();
           return;
         }
-        App.showLoading('正在加载在岗数据…');
+        const showLoading = state.activeView === 'schedule' && state.activeTab === 'coverage';
+        if (showLoading) {
+          App.showLoading('正在加载在岗数据…');
+        }
         try {
           const params = buildParams('coverage_by_day');
           const response = await fetch(`/api/stats.php?${params.toString()}`, {
@@ -432,7 +592,90 @@
         } catch (error) {
           App.toast('网络异常，请稍后再试');
         } finally {
-          App.hideLoading();
+          if (showLoading) {
+            App.hideLoading();
+          }
+        }
+      }
+
+      async function loadPlaylistStats(force = false) {
+        if (!state.hasPlaylistAccess) {
+          state.playlistRecords = [];
+          state.playlistDaily = [];
+          renderPlaylist();
+          return;
+        }
+
+        if (!state.teamId) {
+          state.playlistRecords = [];
+          state.playlistDaily = [];
+          renderPlaylist();
+          return;
+        }
+
+        const startValue = startInput.value ? startInput.value.trim() : '';
+        const endValue = endInput.value ? endInput.value.trim() : '';
+        const key = `${state.teamId}|${startValue}|${endValue}`;
+        if (!force && state.playlistKey === key) {
+          renderPlaylist();
+          return;
+        }
+
+        const showLoading = state.activeView === 'playlist';
+        if (showLoading) {
+          App.showLoading('正在加载播单统计…');
+        }
+
+        try {
+          const params = buildParams('playlist_overview');
+          const response = await fetch(`/api/stats.php?${params.toString()}`, {
+            method: 'GET',
+            credentials: 'include',
+          });
+          if (response.status === 401) {
+            window.location.href = './login.html';
+            return;
+          }
+          if (response.status === 403) {
+            App.toast('无权访问播单统计', { type: 'error' });
+            return;
+          }
+          const data = await response.json().catch(() => null);
+          if (!response.ok || !data || data.ok !== true) {
+            const message = data && (data.error || data.msg);
+            App.toast(message || '加载播单统计失败');
+            return;
+          }
+
+          if (Array.isArray(data.teams) && data.teams.length) {
+            state.teams = data.teams;
+          }
+          if (data.team_id) {
+            state.teamId = data.team_id;
+          }
+          if (data.start) {
+            state.start = data.start;
+          }
+          if (data.end) {
+            state.end = data.end;
+          }
+          if (Number.isFinite(data.range_days)) {
+            state.rangeDays = Number(data.range_days);
+          }
+
+          state.playlistRecords = Array.isArray(data.records) ? data.records : [];
+          state.playlistDaily = Array.isArray(data.daily) ? data.daily : [];
+          state.playlistKey = key;
+
+          updateFiltersFromState();
+          renderPlaylist();
+          renderInfo();
+        } catch (error) {
+          App.toast(error.message || '加载播单统计失败');
+        } finally {
+          if (showLoading) {
+            App.hideLoading();
+          }
         }
       }
 
@@ -491,10 +734,19 @@
       }
 
       function renderInfo() {
-        whiteTarget.textContent = `${state.targetWhite}`;
         const team = state.teams.find((item) => item.id === state.teamId);
         teamInfo.textContent = team ? `团队：${team.name}` : '暂无团队';
-        rangeInfo.textContent = state.rangeDays > 0 ? `统计区间：${state.start} 至 ${state.end}（共 ${state.rangeDays} 天）` : '';
+        if (state.start && state.end) {
+          const totalDays = state.rangeDays > 0 ? `（共 ${state.rangeDays} 天）` : '';
+          rangeInfo.textContent = `统计区间：${state.start} 至 ${state.end}${totalDays}`;
+        } else {
+          rangeInfo.textContent = '';
+        }
+        if (state.activeView === 'playlist') {
+          whiteTarget.textContent = '-';
+        } else {
+          whiteTarget.textContent = `${state.targetWhite}`;
+        }
       }
 
       function renderPersonTable() {
@@ -633,6 +885,108 @@
         });
 
         drawChart(labels, totalSeries, whiteSeries, mid1Series, mid2Series, nightSeries);
+      }
+
+      function renderPlaylist() {
+        if (!playlistPersonBody || !playlistDailyBody) {
+          return;
+        }
+
+        if (!state.hasPlaylistAccess) {
+          playlistPersonBody.innerHTML = '';
+          playlistDailyBody.innerHTML = '';
+          playlistPersonEmpty.classList.add('hidden');
+          playlistDailyEmpty.classList.add('hidden');
+          return;
+        }
+
+        playlistPersonBody.innerHTML = '';
+        if (!state.playlistRecords.length) {
+          playlistPersonEmpty.classList.remove('hidden');
+        } else {
+          playlistPersonEmpty.classList.add('hidden');
+          const rows = state.playlistRecords
+            .map((record) => {
+              const name = record.label || record.display_name || record.name || `#${record.emp_id}`;
+              const white = Number(record.white || 0);
+              const mid = Number(record.mid || 0);
+              const total = Number(record.total || 0);
+              return `
+                <tr class="hover:bg-slate-800/40 transition">
+                  <td class="px-4 py-3">${name}</td>
+                  <td class="px-4 py-3 text-right">${white}</td>
+                  <td class="px-4 py-3 text-right">${mid}</td>
+                  <td class="px-4 py-3 text-right font-semibold text-slate-100">${total}</td>
+                </tr>
+              `;
+            })
+            .join('');
+          playlistPersonBody.innerHTML = rows;
+        }
+
+        playlistDailyBody.innerHTML = '';
+        if (!state.playlistDaily.length) {
+          playlistDailyEmpty.classList.remove('hidden');
+        } else {
+          playlistDailyEmpty.classList.add('hidden');
+          const rows = state.playlistDaily
+            .map((item) => {
+              const day = item.day || '';
+              const weekday = item.weekday || '';
+              const white = Number(item.white || 0);
+              const mid = Number(item.mid || 0);
+              const total = Number(item.total || 0);
+              return `
+                <tr class="hover:bg-slate-800/40 transition">
+                  <td class="px-4 py-3">${day}</td>
+                  <td class="px-4 py-3 text-slate-400">${weekday}</td>
+                  <td class="px-4 py-3 text-right">${white}</td>
+                  <td class="px-4 py-3 text-right">${mid}</td>
+                  <td class="px-4 py-3 text-right font-semibold text-slate-100">${total}</td>
+                </tr>
+              `;
+            })
+            .join('');
+          playlistDailyBody.innerHTML = rows;
+        }
+      }
+
+      function updateViewButtons() {
+        if (viewScheduleBtn) {
+          if (state.activeView === 'schedule') {
+            viewScheduleBtn.classList.add('is-active');
+          } else {
+            viewScheduleBtn.classList.remove('is-active');
+          }
+        }
+        if (viewPlaylistBtn) {
+          if (state.hasPlaylistAccess) {
+            viewPlaylistBtn.classList.remove('hidden');
+            if (state.activeView === 'playlist') {
+              viewPlaylistBtn.classList.add('is-active');
+            } else {
+              viewPlaylistBtn.classList.remove('is-active');
+            }
+          } else {
+            viewPlaylistBtn.classList.add('hidden');
+            viewPlaylistBtn.classList.remove('is-active');
+          }
+        }
+      }
+
+      function renderActiveView() {
+        if (scheduleContainer) {
+          scheduleContainer.classList.toggle('hidden', state.activeView !== 'schedule');
+        }
+        if (playlistContainer) {
+          const visible = state.activeView === 'playlist' && state.hasPlaylistAccess;
+          playlistContainer.classList.toggle('hidden', !visible);
+        }
+        updateViewButtons();
+        renderInfo();
+        if (state.activeView === 'playlist') {
+          renderPlaylist();
+        }
       }
 
       function destroyChart() {
@@ -899,6 +1253,10 @@
       }
 
       function switchTab(tab) {
+        if (state.activeView !== 'schedule') {
+          state.activeTab = 'person';
+          return;
+        }
         if (state.activeTab === tab) return;
         state.activeTab = tab;
         if (tab === 'person') {
