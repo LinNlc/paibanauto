@@ -8,7 +8,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="./app.css?v=20240605" />
     <script src="./app.js?v=20240605"></script>
   </head>
@@ -142,8 +141,12 @@
 
           <div id="coverage-container" class="space-y-6 hidden">
             <div class="grid gap-6 lg:grid-cols-3">
-              <div class="lg:col-span-2 h-80">
+              <div class="lg:col-span-2 h-80 relative">
                 <canvas id="coverage-chart" class="w-full h-full"></canvas>
+                <div
+                  id="coverage-legend"
+                  class="absolute top-3 right-3 flex flex-wrap gap-3 text-xs text-slate-200"
+                ></div>
               </div>
               <div class="flex flex-col gap-3 text-sm text-slate-300 bg-slate-900/70 border border-slate-800/70 rounded-2xl p-4">
                 <h3 class="text-base font-semibold text-slate-100">视图说明</h3>
@@ -187,7 +190,7 @@
         personRecords: [],
         coverageDaily: [],
         activeTab: 'person',
-        chart: null,
+        chartData: null,
         coverageKey: '',
         isLoading: false,
       };
@@ -247,6 +250,7 @@
       const personEmpty = document.getElementById('person-empty');
       const coverageTable = document.getElementById('coverage-table');
       const coverageEmpty = document.getElementById('coverage-empty');
+      const coverageLegend = document.getElementById('coverage-legend');
       const tabPerson = document.getElementById('tab-person');
       const tabCoverage = document.getElementById('tab-coverage');
       const personContainer = document.getElementById('person-container');
@@ -631,119 +635,267 @@
         drawChart(labels, totalSeries, whiteSeries, mid1Series, mid2Series, nightSeries);
       }
 
+      function destroyChart() {
+        const canvas = document.getElementById('coverage-chart');
+        if (canvas) {
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+          }
+        }
+        if (coverageLegend) {
+          coverageLegend.innerHTML = '';
+        }
+        state.chartData = null;
+      }
+
       function drawChart(labels, totals, white, mid1, mid2, night) {
-        destroyChart();
-        const ctx = document.getElementById('coverage-chart').getContext('2d');
-        state.chart = new Chart(ctx, {
-          type: 'bar',
-          data: {
-            labels,
-            datasets: [
-              {
-                label: '白班',
-                data: white,
-                backgroundColor: 'rgba(56, 189, 248, 0.55)',
-                borderRadius: 14,
-                stack: 'shifts',
-              },
-              {
-                label: '中1',
-                data: mid1,
-                backgroundColor: 'rgba(129, 140, 248, 0.6)',
-                borderRadius: 14,
-                stack: 'shifts',
-              },
-              {
-                label: '中2',
-                data: mid2,
-                backgroundColor: 'rgba(236, 72, 153, 0.55)',
-                borderRadius: 14,
-                stack: 'shifts',
-              },
-              {
-                label: '夜班',
-                data: night,
-                backgroundColor: 'rgba(20, 184, 166, 0.6)',
-                borderRadius: 14,
-                stack: 'shifts',
-              },
-              {
-                type: 'line',
-                label: '在岗人数',
-                data: totals,
-                borderColor: '#facc15',
-                backgroundColor: '#facc15',
-                borderWidth: 2,
-                tension: 0.35,
-                fill: false,
-                yAxisID: 'yLine',
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: {
-              mode: 'index',
-              intersect: false,
-            },
-            plugins: {
-              legend: {
-                labels: {
-                  color: '#cbd5f5',
-                },
-              },
-              tooltip: {
-                callbacks: {
-                  label(context) {
-                    const value = context.parsed.y ?? context.parsed;
-                    return `${context.dataset.label}: ${value}`;
-                  },
-                },
-              },
-            },
-            scales: {
-              x: {
-                stacked: true,
-                ticks: {
-                  color: '#94a3b8',
-                },
-                grid: {
-                  color: 'rgba(148, 163, 184, 0.1)',
-                },
-              },
-              y: {
-                stacked: true,
-                position: 'left',
-                ticks: {
-                  color: '#94a3b8',
-                  precision: 0,
-                },
-                grid: {
-                  color: 'rgba(148, 163, 184, 0.1)',
-                },
-              },
-              yLine: {
-                stacked: false,
-                position: 'right',
-                ticks: {
-                  color: '#fde68a',
-                  precision: 0,
-                },
-                grid: {
-                  drawOnChartArea: false,
-                },
-              },
-            },
-          },
+        state.chartData = {
+          labels: Array.from(labels),
+          totals: Array.from(totals),
+          white: Array.from(white),
+          mid1: Array.from(mid1),
+          mid2: Array.from(mid2),
+          night: Array.from(night),
+        };
+        renderCoverageChart();
+      }
+
+      function renderCoverageChart() {
+        if (!state.chartData) {
+          return;
+        }
+
+        const canvas = document.getElementById('coverage-chart');
+        if (!canvas) {
+          return;
+        }
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return;
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        let width = Math.floor(rect.width);
+        let height = Math.floor(rect.height);
+        if (!width || !height) {
+          const parent = canvas.parentElement;
+          width = Math.floor(parent ? parent.clientWidth : 600) || 600;
+          height = Math.floor(parent ? parent.clientHeight : 320) || 320;
+        }
+
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.scale(dpr, dpr);
+
+        try {
+          const margin = { top: 24, right: 36, bottom: 48, left: 56 };
+          const chartWidth = width - margin.left - margin.right;
+          const chartHeight = height - margin.top - margin.bottom;
+          if (chartWidth <= 0 || chartHeight <= 0) {
+            return;
+          }
+
+          const stackedData = state.chartData.labels.map((label, index) => {
+            const whiteValue = Number(state.chartData.white[index] || 0);
+            const mid1Value = Number(state.chartData.mid1[index] || 0);
+            const mid2Value = Number(state.chartData.mid2[index] || 0);
+            const nightValue = Number(state.chartData.night[index] || 0);
+            const totalValue = Number(state.chartData.totals[index] || 0);
+            return {
+              label,
+              total: totalValue,
+              segments: [
+                { value: whiteValue, color: 'rgba(56, 189, 248, 0.75)' },
+                { value: mid1Value, color: 'rgba(129, 140, 248, 0.75)' },
+                { value: mid2Value, color: 'rgba(236, 72, 153, 0.7)' },
+                { value: nightValue, color: 'rgba(20, 184, 166, 0.75)' },
+              ],
+            };
+          });
+
+          const maxValue = stackedData.reduce((max, item) => {
+            const stackTotal = item.segments.reduce((sum, seg) => sum + seg.value, 0);
+            return Math.max(max, stackTotal, item.total);
+          }, 0);
+
+          const yMax = calculateNiceMax(maxValue);
+          const ySteps = 5;
+          const yStepValue = yMax / ySteps;
+          const unitHeight = chartHeight / yMax;
+
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)';
+          ctx.fillStyle = '#cbd5f5';
+          ctx.font = '12px "Inter", "PingFang SC", "Microsoft YaHei", sans-serif';
+
+          for (let i = 0; i <= ySteps; i += 1) {
+            const value = yStepValue * i;
+            const y = margin.top + chartHeight - value * unitHeight;
+            ctx.beginPath();
+            ctx.moveTo(margin.left, y);
+            ctx.lineTo(margin.left + chartWidth, y);
+            ctx.stroke();
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(formatAxisValue(value), margin.left - 8, y);
+          }
+
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+          ctx.beginPath();
+          ctx.moveTo(margin.left, margin.top);
+          ctx.lineTo(margin.left, margin.top + chartHeight);
+          ctx.lineTo(margin.left + chartWidth, margin.top + chartHeight);
+          ctx.stroke();
+
+          const slotWidth = chartWidth / Math.max(1, stackedData.length);
+          let gap = Math.min(12, slotWidth * 0.25);
+          if (gap < 4) {
+            gap = Math.max(slotWidth * 0.1, 2);
+          }
+          let barWidth = slotWidth - gap;
+          if (barWidth < 6) {
+            barWidth = Math.max(slotWidth * 0.6, 4);
+            gap = slotWidth - barWidth;
+          }
+          const barOffset = gap / 2;
+
+          stackedData.forEach((item, index) => {
+            let currentY = margin.top + chartHeight;
+            const x = margin.left + index * slotWidth + barOffset;
+            item.segments.forEach((segment) => {
+              if (segment.value <= 0) {
+                return;
+              }
+              const heightValue = segment.value * unitHeight;
+              currentY -= heightValue;
+              ctx.fillStyle = segment.color;
+              ctx.fillRect(x, currentY, barWidth, heightValue);
+            });
+          });
+
+          ctx.strokeStyle = '#facc15';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          stackedData.forEach((item, index) => {
+            const centerX = margin.left + index * slotWidth + barOffset + barWidth / 2;
+            const y = margin.top + chartHeight - item.total * unitHeight;
+            if (index === 0) {
+              ctx.moveTo(centerX, y);
+            } else {
+              ctx.lineTo(centerX, y);
+            }
+          });
+          ctx.stroke();
+
+          stackedData.forEach((item, index) => {
+            const centerX = margin.left + index * slotWidth + barOffset + barWidth / 2;
+            const y = margin.top + chartHeight - item.total * unitHeight;
+            ctx.beginPath();
+            ctx.arc(centerX, y, 3, 0, Math.PI * 2);
+            ctx.fillStyle = '#facc15';
+            ctx.fill();
+          });
+
+          const labelStep = Math.max(1, Math.ceil(stackedData.length / 12));
+          ctx.fillStyle = '#94a3b8';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          stackedData.forEach((item, index) => {
+            if (labelStep > 1 && index % labelStep !== 0 && index !== stackedData.length - 1) {
+              return;
+            }
+            const centerX = margin.left + index * slotWidth + barOffset + barWidth / 2;
+            ctx.fillText(item.label, centerX, margin.top + chartHeight + 8);
+          });
+
+          updateCoverageLegend();
+        } finally {
+          ctx.restore();
+        }
+      }
+
+      function updateCoverageLegend() {
+        if (!coverageLegend) {
+          return;
+        }
+
+        coverageLegend.innerHTML = '';
+        if (!state.chartData) {
+          return;
+        }
+
+        const items = [
+          { label: '白班', color: 'rgba(56, 189, 248, 0.75)', variant: 'bar' },
+          { label: '中1', color: 'rgba(129, 140, 248, 0.75)', variant: 'bar' },
+          { label: '中2', color: 'rgba(236, 72, 153, 0.7)', variant: 'bar' },
+          { label: '夜班', color: 'rgba(20, 184, 166, 0.75)', variant: 'bar' },
+          { label: '在岗人数', color: '#facc15', variant: 'line' },
+        ];
+
+        items.forEach((item) => {
+          const entry = document.createElement('span');
+          entry.className = 'flex items-center gap-2 bg-slate-900/70 border border-slate-700/60 rounded-full px-2 py-1';
+
+          const marker = document.createElement('span');
+          marker.style.display = 'inline-block';
+          marker.style.width = item.variant === 'line' ? '16px' : '12px';
+          marker.style.height = item.variant === 'line' ? '2px' : '12px';
+          marker.style.backgroundColor = item.color;
+          marker.style.borderRadius = item.variant === 'line' ? '9999px' : '4px';
+          marker.style.marginTop = item.variant === 'line' ? '3px' : '0';
+
+          const label = document.createElement('span');
+          label.textContent = item.label;
+          label.className = 'text-slate-100';
+
+          entry.appendChild(marker);
+          entry.appendChild(label);
+          coverageLegend.appendChild(entry);
         });
       }
 
-      function destroyChart() {
-        if (state.chart) {
-          state.chart.destroy();
-          state.chart = null;
+      function calculateNiceMax(value) {
+        if (!Number.isFinite(value) || value <= 0) {
+          return 1;
         }
+
+        const exponent = Math.floor(Math.log10(value));
+        const magnitude = 10 ** exponent;
+        const normalized = value / magnitude;
+
+        let niceNormalized;
+        if (normalized <= 1) {
+          niceNormalized = 1;
+        } else if (normalized <= 2) {
+          niceNormalized = 2;
+        } else if (normalized <= 5) {
+          niceNormalized = 5;
+        } else {
+          niceNormalized = 10;
+        }
+
+        return niceNormalized * magnitude;
+      }
+
+      function formatAxisValue(value) {
+        if (!Number.isFinite(value)) {
+          return '0';
+        }
+
+        if (Number.isInteger(value)) {
+          return `${value}`;
+        }
+
+        if (Math.abs(value) < 1) {
+          return value.toFixed(2);
+        }
+
+        return value.toFixed(1);
       }
 
       function switchTab(tab) {
@@ -762,6 +914,18 @@
           loadCoverageStats();
         }
       }
+
+      let resizeTimer = null;
+      window.addEventListener('resize', () => {
+        if (resizeTimer) {
+          clearTimeout(resizeTimer);
+        }
+        resizeTimer = setTimeout(() => {
+          if (state.activeTab === 'coverage' && state.chartData) {
+            renderCoverageChart();
+          }
+        }, 180);
+      });
 
       App.ready(() => {
         App.initSidebar({ activeView: 'stats' });
