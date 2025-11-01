@@ -26,10 +26,11 @@ INSERT OR IGNORE INTO teams (id, name, settings_json) VALUES (1, '默认团队',
 INSERT OR IGNORE INTO users (
     id, username, display_name, password_hash, role,
     allowed_teams_json, allowed_views_json, editable_teams_json,
-    disabled, created_at
+    features_json, disabled, created_at
 ) VALUES (
     1, 'admin', '管理员', '$2y$12$COi/ECLUl0ZonJ5IJPzhT.ph/9b87G61.6Ero/N.vpbR4/nU0/qhi', 'admin',
     '[1]', '["people","schedule","stats"]', '[1]',
+    '{"scheduleFloatingBall":true,"scheduleImportExport":true,"scheduleAssistSettings":true,"scheduleAi":false}',
     0, datetime('now')
 );
 

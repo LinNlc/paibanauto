@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     allowed_teams_json TEXT DEFAULT '[]',
     allowed_views_json TEXT DEFAULT '[]',
     editable_teams_json TEXT DEFAULT '[]',
+    features_json TEXT DEFAULT '{}',
     disabled INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

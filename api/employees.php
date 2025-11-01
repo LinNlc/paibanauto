@@ -107,7 +107,7 @@ function fetch_accessible_teams(PDO $pdo, array $permissions): array
     $allowed = $permissions['allowed_teams'] ?? null;
 
     if ($allowed === null) {
-        $stmt = $pdo->query('SELECT id, name FROM teams ORDER BY name ASC, id ASC');
+        $stmt = $pdo->query('SELECT id, name, settings_json FROM teams ORDER BY name ASC, id ASC');
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     } elseif ($allowed === []) {
         $rows = [];
@@ -119,7 +119,7 @@ function fetch_accessible_teams(PDO $pdo, array $permissions): array
             $placeholders[] = $key;
             $params[$key] = $teamId;
         }
-        $sql = 'SELECT id, name FROM teams WHERE id IN (' . implode(',', $placeholders) . ') ORDER BY name ASC, id ASC';
+        $sql = 'SELECT id, name, settings_json FROM teams WHERE id IN (' . implode(',', $placeholders) . ') ORDER BY name ASC, id ASC';
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -129,6 +129,7 @@ function fetch_accessible_teams(PDO $pdo, array $permissions): array
         return [
             'id' => (int) $row['id'],
             'name' => (string) $row['name'],
+            'settings' => decode_team_settings($row['settings_json'] ?? '{}'),
         ];
     }, $rows);
 }
