@@ -19,14 +19,83 @@ function db(): PDO
     }
 
     $config = app_config();
-    $dsn = 'sqlite:' . $config['db_path'];
+    $dbPath = (string)($config['db_path'] ?? '');
+    if ($dbPath === '') {
+        throw new RuntimeException('database path is not configured');
+    }
+
+    $dir = dirname($dbPath);
+    if ($dir !== '' && !is_dir($dir)) {
+        if (!mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new RuntimeException('failed to create database directory');
+        }
+    }
+
+    $dsn = 'sqlite:' . $dbPath;
     $pdo = new PDO($dsn, null, null, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
     ]);
 
+    ensure_schema_up_to_date($pdo);
+
     return $pdo;
+}
+
+function ensure_schema_up_to_date(PDO $pdo): void
+{
+    static $applied = false;
+    if ($applied) {
+        return;
+    }
+
+    $pdo->exec('PRAGMA foreign_keys = ON');
+
+    ensure_table_column($pdo, 'teams', 'settings_json', "ALTER TABLE teams ADD COLUMN settings_json TEXT DEFAULT '{}'");
+
+    ensure_table_column($pdo, 'users', 'display_name', "ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT ''");
+    ensure_table_column($pdo, 'users', 'role', "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
+    ensure_table_column($pdo, 'users', 'allowed_teams_json', "ALTER TABLE users ADD COLUMN allowed_teams_json TEXT DEFAULT '[]'");
+    ensure_table_column($pdo, 'users', 'allowed_views_json', "ALTER TABLE users ADD COLUMN allowed_views_json TEXT DEFAULT '[]'");
+    ensure_table_column($pdo, 'users', 'editable_teams_json', "ALTER TABLE users ADD COLUMN editable_teams_json TEXT DEFAULT '[]'");
+    ensure_table_column($pdo, 'users', 'features_json', "ALTER TABLE users ADD COLUMN features_json TEXT DEFAULT '{}'");
+    ensure_table_column($pdo, 'users', 'disabled', "ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0");
+
+    $applied = true;
+}
+
+function ensure_table_column(PDO $pdo, string $table, string $column, string $ddl): void
+{
+    if (table_has_column($pdo, $table, $column)) {
+        return;
+    }
+
+    $pdo->exec($ddl);
+}
+
+function table_has_column(PDO $pdo, string $table, string $column): bool
+{
+    if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $table)) {
+        throw new InvalidArgumentException('invalid table name');
+    }
+    if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $column)) {
+        throw new InvalidArgumentException('invalid column name');
+    }
+
+    $stmt = $pdo->query('PRAGMA table_info(' . $table . ')');
+    if ($stmt === false) {
+        return false;
+    }
+
+    $columns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($columns as $info) {
+        if (isset($info['name']) && strcasecmp((string) $info['name'], $column) === 0) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function json_ok(array $data = []): void
@@ -154,6 +223,7 @@ function merge_user_permissions(array $user, array $permissions): array
 
     $user['allowed_teams'] = $permissions['allowed_teams'] ?? null;
     $user['editable_teams'] = $permissions['editable_teams'] ?? null;
+    $user['features'] = $permissions['features'] ?? normalize_feature_flags(null);
 
     return $user;
 }
@@ -239,6 +309,12 @@ function decode_json_field(?string $json, $default)
     return is_array($data) ? $data : $default;
 }
 
+function decode_team_settings(?string $json): array
+{
+    $settings = decode_json_field($json, []);
+    return normalize_team_settings($settings);
+}
+
 function encode_json_field($value): string
 {
     $encoded = json_encode($value, JSON_UNESCAPED_UNICODE);
@@ -317,6 +393,197 @@ function normalize_string_list($value): array
     return array_values($result);
 }
 
+function normalize_feature_flags($value): array
+{
+    $defaults = [
+        'scheduleFloatingBall' => false,
+        'scheduleImportExport' => false,
+        'scheduleAssistSettings' => false,
+        'scheduleAi' => false,
+    ];
+
+    if (!is_array($value)) {
+        return $defaults;
+    }
+
+    foreach ($defaults as $key => $fallback) {
+        $raw = $value[$key] ?? $fallback;
+        $defaults[$key] = is_bool($raw) ? $raw : (bool) $raw;
+    }
+
+    return $defaults;
+}
+
+function schedule_assist_color_options(): array
+{
+    return [
+        'white' => ['sky', 'amber', 'emerald', 'slate'],
+        'mid1' => ['indigo', 'violet', 'amber', 'slate'],
+        'mid2' => ['teal', 'emerald', 'cyan', 'slate'],
+        'night' => ['rose', 'violet', 'amber', 'slate'],
+    ];
+}
+
+function schedule_summary_color_options(): array
+{
+    return ['emerald', 'sky', 'amber', 'rose', 'slate'];
+}
+
+function schedule_assist_default_settings(): array
+{
+    return [
+        'shiftColors' => [
+            'white' => 'sky',
+            'mid1' => 'indigo',
+            'mid2' => 'teal',
+            'night' => 'rose',
+        ],
+        'hover' => [
+            'showAnnual' => true,
+            'showQuarterly' => true,
+        ],
+        'dailySummary' => [
+            'enabled' => true,
+            'showTotal' => true,
+            'showWhite' => true,
+            'showMid1' => true,
+            'showMid2' => true,
+            'showNight' => true,
+            'thresholds' => [
+                'total' => [
+                    'high' => ['value' => null, 'color' => 'emerald'],
+                    'low' => ['value' => null, 'color' => 'rose'],
+                ],
+                'white' => [
+                    'high' => ['value' => null, 'color' => 'emerald'],
+                    'low' => ['value' => null, 'color' => 'rose'],
+                ],
+                'mid1' => [
+                    'high' => ['value' => null, 'color' => 'emerald'],
+                    'low' => ['value' => null, 'color' => 'rose'],
+                ],
+                'mid2' => [
+                    'high' => ['value' => null, 'color' => 'emerald'],
+                    'low' => ['value' => null, 'color' => 'rose'],
+                ],
+                'night' => [
+                    'high' => ['value' => null, 'color' => 'emerald'],
+                    'low' => ['value' => null, 'color' => 'rose'],
+                ],
+            ],
+        ],
+    ];
+}
+
+function normalize_assist_shift_colors($value): array
+{
+    $defaults = schedule_assist_default_settings()['shiftColors'];
+    $options = schedule_assist_color_options();
+    if (!is_array($value)) {
+        return $defaults;
+    }
+
+    foreach ($defaults as $key => $fallback) {
+        $raw = isset($value[$key]) ? (string) $value[$key] : $fallback;
+        if (!in_array($raw, $options[$key], true)) {
+            $raw = $fallback;
+        }
+        $defaults[$key] = $raw;
+    }
+
+    return $defaults;
+}
+
+function normalize_assist_hover($value): array
+{
+    $defaults = schedule_assist_default_settings()['hover'];
+    if (!is_array($value)) {
+        return $defaults;
+    }
+
+    foreach ($defaults as $key => $fallback) {
+        $raw = $value[$key] ?? $fallback;
+        $defaults[$key] = is_bool($raw) ? $raw : (bool) $raw;
+    }
+
+    return $defaults;
+}
+
+function normalize_assist_threshold($value, string $defaultColor): array
+{
+    $allowedColors = schedule_summary_color_options();
+    $normalized = ['value' => null, 'color' => $defaultColor];
+    if (is_array($value)) {
+        if (isset($value['value'])) {
+            $num = $value['value'];
+            if ($num === null || $num === '' || !is_numeric($num)) {
+                $normalized['value'] = null;
+            } else {
+                $parsed = (int) $num;
+                $normalized['value'] = $parsed >= 0 ? $parsed : null;
+            }
+        }
+        if (isset($value['color'])) {
+            $color = (string) $value['color'];
+            if (in_array($color, $allowedColors, true)) {
+                $normalized['color'] = $color;
+            }
+        }
+    }
+
+    return $normalized;
+}
+
+function normalize_assist_daily_summary($value): array
+{
+    $defaults = schedule_assist_default_settings()['dailySummary'];
+    if (!is_array($value)) {
+        return $defaults;
+    }
+
+    foreach (['enabled', 'showTotal', 'showWhite', 'showMid1', 'showMid2', 'showNight'] as $key) {
+        $raw = $value[$key] ?? $defaults[$key];
+        $defaults[$key] = is_bool($raw) ? $raw : (bool) $raw;
+    }
+
+    $thresholds = $value['thresholds'] ?? [];
+    if (!is_array($thresholds)) {
+        $thresholds = [];
+    }
+
+    foreach ($defaults['thresholds'] as $key => $config) {
+        $raw = $thresholds[$key] ?? [];
+        $defaults['thresholds'][$key] = [
+            'high' => normalize_assist_threshold($raw['high'] ?? null, $config['high']['color']),
+            'low' => normalize_assist_threshold($raw['low'] ?? null, $config['low']['color']),
+        ];
+    }
+
+    return $defaults;
+}
+
+function normalize_assist_settings($value): array
+{
+    $defaults = schedule_assist_default_settings();
+    if (!is_array($value)) {
+        return $defaults;
+    }
+
+    $defaults['shiftColors'] = normalize_assist_shift_colors($value['shiftColors'] ?? []);
+    $defaults['hover'] = normalize_assist_hover($value['hover'] ?? []);
+    $defaults['dailySummary'] = normalize_assist_daily_summary($value['dailySummary'] ?? []);
+
+    return $defaults;
+}
+
+function normalize_team_settings($value): array
+{
+    $settings = is_array($value) ? $value : [];
+    $assist = $settings['assist'] ?? [];
+    $settings['assist'] = normalize_assist_settings($assist);
+    return $settings;
+}
+
 function get_shift_options(): array
 {
     $config = app_config();
@@ -343,7 +610,7 @@ function load_user_permissions(PDO $pdo, int $userId): ?array
         return null;
     }
 
-    $stmt = $pdo->prepare('SELECT id, role, disabled, allowed_teams_json, allowed_views_json, editable_teams_json FROM users WHERE id = :id LIMIT 1');
+    $stmt = $pdo->prepare('SELECT id, role, disabled, allowed_teams_json, allowed_views_json, editable_teams_json, features_json FROM users WHERE id = :id LIMIT 1');
     $stmt->execute([':id' => $userId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row || (int) $row['disabled'] === 1) {
@@ -355,6 +622,7 @@ function load_user_permissions(PDO $pdo, int $userId): ?array
     $allowedTeams = $isAdmin ? null : normalize_id_list(decode_json_field($row['allowed_teams_json'] ?? '[]', []));
     $editableTeams = $isAdmin ? null : normalize_id_list(decode_json_field($row['editable_teams_json'] ?? '[]', []));
     $allowedViews = $isAdmin ? ['*'] : normalize_string_list(decode_json_field($row['allowed_views_json'] ?? '[]', []));
+    $features = normalize_feature_flags(decode_json_field($row['features_json'] ?? '{}', []));
 
     return [
         'id' => (int) $row['id'],
@@ -363,6 +631,7 @@ function load_user_permissions(PDO $pdo, int $userId): ?array
         'allowed_teams' => $allowedTeams,
         'editable_teams' => $editableTeams,
         'allowed_views' => $allowedViews,
+        'features' => $features,
     ];
 }
 
@@ -410,6 +679,24 @@ function permissions_can_edit_team(array $permissions, int $teamId): bool
     }
 
     return in_array($teamId, $editable, true);
+}
+
+function permissions_has_feature(array $permissions, string $feature): bool
+{
+    if (($permissions['is_admin'] ?? false) === true) {
+        return true;
+    }
+
+    $features = $permissions['features'] ?? [];
+    if (!is_array($features)) {
+        return false;
+    }
+
+    if (array_key_exists($feature, $features)) {
+        return (bool) $features[$feature];
+    }
+
+    return false;
 }
 
 function sse_events_log_path(): string

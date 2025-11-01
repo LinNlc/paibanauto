@@ -151,6 +151,11 @@
                   <span class="block text-sm font-medium mb-2">可访问视图</span>
                   <div id="allowed-views" class="flex flex-wrap gap-3"></div>
                 </div>
+                <div>
+                  <span class="block text-sm font-medium mb-2">悬浮球功能权限</span>
+                  <div id="feature-flags" class="flex flex-wrap gap-3"></div>
+                  <p class="text-xs text-slate-500 mt-1">针对排班表悬浮球的各项功能进行授权控制。</p>
+                </div>
                 <div class="flex items-center gap-2">
                   <input id="user-disabled" type="checkbox" class="w-4 h-4 rounded border-slate-700 bg-slate-900" />
                   <label for="user-disabled" class="text-sm">禁用该账号</label>
@@ -202,6 +207,39 @@
         { value: 'admin', label: '权限设置' },
       ];
 
+      const featureOptions = [
+        { key: 'scheduleFloatingBall', label: '启用悬浮球' },
+        { key: 'scheduleImportExport', label: '导入 / 导出' },
+        { key: 'scheduleAssistSettings', label: '辅助设置管理' },
+        { key: 'scheduleAi', label: 'AI 排班' },
+      ];
+
+      function getRoleFeatureDefaults(role) {
+        const normalized = String(role || 'editor').toLowerCase();
+        if (normalized === 'admin') {
+          return {
+            scheduleFloatingBall: true,
+            scheduleImportExport: true,
+            scheduleAssistSettings: true,
+            scheduleAi: true,
+          };
+        }
+        if (normalized === 'readonly') {
+          return {
+            scheduleFloatingBall: false,
+            scheduleImportExport: false,
+            scheduleAssistSettings: false,
+            scheduleAi: false,
+          };
+        }
+        return {
+          scheduleFloatingBall: true,
+          scheduleImportExport: true,
+          scheduleAssistSettings: true,
+          scheduleAi: false,
+        };
+      }
+
       const state = {
         me: null,
         teams: [],
@@ -223,6 +261,7 @@
         allowedTeams: document.getElementById('allowed-teams'),
         editableTeams: document.getElementById('editable-teams'),
         allowedViews: document.getElementById('allowed-views'),
+        featureFlags: document.getElementById('feature-flags'),
         userDisabled: document.getElementById('user-disabled'),
         userFormStatus: document.getElementById('user-form-status'),
         userFormReset: document.getElementById('user-form-reset'),
@@ -427,6 +466,45 @@
           .map((input) => input.value);
       }
 
+      function renderFeatureCheckboxes(features = {}) {
+        const normalized = {
+          scheduleFloatingBall: Boolean(features.scheduleFloatingBall),
+          scheduleImportExport: Boolean(features.scheduleImportExport),
+          scheduleAssistSettings: Boolean(features.scheduleAssistSettings),
+          scheduleAi: Boolean(features.scheduleAi),
+        };
+
+        elements.featureFlags.innerHTML = featureOptions
+          .map((item) => {
+            const checked = normalized[item.key] ? 'checked' : '';
+            return `
+              <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" data-feature="${item.key}" class="w-4 h-4 rounded border-slate-700 bg-slate-900" ${checked} />
+                <span>${item.label}</span>
+              </label>
+            `;
+          })
+          .join('');
+      }
+
+      function collectFeatureFlags() {
+        const result = {};
+        featureOptions.forEach((item) => {
+          const input = elements.featureFlags.querySelector(`input[data-feature="${item.key}"]`);
+          result[item.key] = input ? input.checked : false;
+        });
+        return result;
+      }
+
+      if (elements.userRole) {
+        elements.userRole.addEventListener('change', () => {
+          if (state.editingUserId) {
+            return;
+          }
+          renderFeatureCheckboxes(getRoleFeatureDefaults(elements.userRole.value));
+        });
+      }
+
       function resetUserForm() {
         state.editingUserId = null;
         elements.userId.value = '';
@@ -439,6 +517,7 @@
         populateTeamSelect(elements.allowedTeams, []);
         populateTeamSelect(elements.editableTeams, []);
         renderAllowedViewCheckboxes([]);
+        renderFeatureCheckboxes(getRoleFeatureDefaults(elements.userRole.value));
         elements.userDisabled.checked = false;
         elements.userFormStatus.textContent = '新建模式';
         elements.userResetPassword.classList.add('hidden');
@@ -457,6 +536,7 @@
         populateTeamSelect(elements.allowedTeams, user.allowed_teams || []);
         populateTeamSelect(elements.editableTeams, user.editable_teams || []);
         renderAllowedViewCheckboxes(user.allowed_views || []);
+        renderFeatureCheckboxes(user.features || getRoleFeatureDefaults(user.role || 'editor'));
         elements.userDisabled.checked = Boolean(user.disabled);
         elements.userFormStatus.textContent = `编辑模式 · #${user.id}`;
         elements.userResetPassword.classList.remove('hidden');
@@ -678,6 +758,7 @@
         const allowedTeams = getSelectedTeamIds(elements.allowedTeams);
         const editableTeams = getSelectedTeamIds(elements.editableTeams);
         const allowedViews = collectSelectedViews();
+        const features = collectFeatureFlags();
         const disabled = elements.userDisabled.checked;
 
         const payload = {
@@ -688,6 +769,7 @@
           allowed_teams: allowedTeams,
           editable_teams: editableTeams,
           allowed_views: allowedViews,
+          features,
           disabled,
         };
 

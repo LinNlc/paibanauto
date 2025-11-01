@@ -18,11 +18,18 @@ switch ($method) {
     case 'POST':
         $payload = read_json_payload();
         $action = strtolower((string) ($payload['action'] ?? ''));
-        if ($action !== 'upsert_cell') {
-            json_err('未知操作', 400);
-        }
+    if ($action === 'upsert_cell') {
         handle_schedule_upsert($pdo, $user, $permissions, $payload);
         break;
+    }
+
+    if ($action === 'update_settings') {
+        handle_schedule_settings_update($pdo, $user, $permissions, $payload);
+        break;
+    }
+
+    json_err('未知操作', 400);
+    break;
     default:
         header('Allow: GET, POST');
         json_err('Method Not Allowed', 405);
@@ -56,6 +63,7 @@ function handle_schedule_get(PDO $pdo, array $user, array $permissions): void
             'can_edit' => false,
             'shift_options' => get_shift_options(),
             'user' => $user,
+            'assist_settings' => schedule_assist_default_settings(),
         ]);
     }
 
@@ -63,6 +71,15 @@ function handle_schedule_get(PDO $pdo, array $user, array $permissions): void
 
     $employees = fetch_team_employees($pdo, $teamId);
     $cells = fetch_schedule_cells($pdo, $teamId, $startDate, $endDate);
+    $activeSettings = schedule_assist_default_settings();
+    foreach ($teams as $teamRow) {
+        if ((int) ($teamRow['id'] ?? 0) === $teamId) {
+            if (isset($teamRow['settings']) && is_array($teamRow['settings'])) {
+                $activeSettings = normalize_assist_settings($teamRow['settings']['assist'] ?? []);
+            }
+            break;
+        }
+    }
 
     json_ok([
         'teams' => $teams,
@@ -74,6 +91,7 @@ function handle_schedule_get(PDO $pdo, array $user, array $permissions): void
         'can_edit' => $canEdit,
         'shift_options' => get_shift_options(),
         'user' => $user,
+        'assist_settings' => $activeSettings,
     ]);
 }
 
@@ -162,6 +180,44 @@ function handle_schedule_upsert(PDO $pdo, array $user, array $permissions, array
     ]);
 }
 
+function handle_schedule_settings_update(PDO $pdo, array $user, array $permissions, array $payload): void
+{
+    $teamId = isset($payload['team_id']) ? (int) $payload['team_id'] : 0;
+    if ($teamId <= 0) {
+        json_err('缺少有效的团队ID', 422);
+    }
+
+    if (!permissions_can_access_team($permissions, $teamId)) {
+        permission_denied();
+    }
+
+    if (!permissions_has_feature($permissions, 'scheduleAssistSettings')) {
+        permission_denied();
+    }
+
+    $assistPayload = isset($payload['assist']) && is_array($payload['assist']) ? $payload['assist'] : [];
+    $assistSettings = normalize_assist_settings($assistPayload);
+
+    $current = fetch_team_settings($pdo, $teamId);
+    if ($current === null) {
+        json_err('团队不存在', 404);
+    }
+
+    $merged = $current['settings'];
+    $merged['assist'] = $assistSettings;
+
+    $stmt = $pdo->prepare('UPDATE teams SET settings_json = :settings WHERE id = :id');
+    $stmt->execute([
+        ':settings' => encode_json_field($merged),
+        ':id' => $teamId,
+    ]);
+
+    json_ok([
+        'settings' => $merged,
+        'assist_settings' => $assistSettings,
+    ]);
+}
+
 function read_json_payload(): array
 {
     $content = file_get_contents('php://input');
@@ -226,14 +282,28 @@ function normalize_day(string $value): ?string
 function fetch_accessible_teams(PDO $pdo, array $permissions): array
 {
     if (($permissions['is_admin'] ?? false) === true) {
-        $stmt = $pdo->query('SELECT id, name FROM teams ORDER BY name ASC, id ASC');
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $stmt = $pdo->query('SELECT id, name, settings_json FROM teams ORDER BY name ASC, id ASC');
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_map(static function (array $row): array {
+            return [
+                'id' => (int) $row['id'],
+                'name' => (string) $row['name'],
+                'settings' => decode_team_settings($row['settings_json'] ?? '{}'),
+            ];
+        }, $rows);
     }
 
     $allowed = $permissions['allowed_teams'] ?? [];
     if ($allowed === null) {
-        $stmt = $pdo->query('SELECT id, name FROM teams ORDER BY name ASC, id ASC');
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $stmt = $pdo->query('SELECT id, name, settings_json FROM teams ORDER BY name ASC, id ASC');
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_map(static function (array $row): array {
+            return [
+                'id' => (int) $row['id'],
+                'name' => (string) $row['name'],
+                'settings' => decode_team_settings($row['settings_json'] ?? '{}'),
+            ];
+        }, $rows);
     }
 
     if ($allowed === []) {
@@ -241,10 +311,18 @@ function fetch_accessible_teams(PDO $pdo, array $permissions): array
     }
 
     $placeholders = implode(', ', array_fill(0, count($allowed), '?'));
-    $stmt = $pdo->prepare('SELECT id, name FROM teams WHERE id IN (' . $placeholders . ') ORDER BY name ASC, id ASC');
+    $stmt = $pdo->prepare('SELECT id, name, settings_json FROM teams WHERE id IN (' . $placeholders . ') ORDER BY name ASC, id ASC');
     $stmt->execute($allowed);
 
-    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    return array_map(static function (array $row): array {
+        return [
+            'id' => (int) $row['id'],
+            'name' => (string) $row['name'],
+            'settings' => decode_team_settings($row['settings_json'] ?? '{}'),
+        ];
+    }, $rows);
 }
 
 function team_in_list(array $teams, int $teamId): bool
@@ -276,6 +354,22 @@ function fetch_team_employees(PDO $pdo, int $teamId): array
     }
 
     return $result;
+}
+
+function fetch_team_settings(PDO $pdo, int $teamId): ?array
+{
+    $stmt = $pdo->prepare('SELECT id, name, settings_json FROM teams WHERE id = :id LIMIT 1');
+    $stmt->execute([':id' => $teamId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return null;
+    }
+
+    return [
+        'id' => (int) $row['id'],
+        'name' => (string) $row['name'],
+        'settings' => decode_team_settings($row['settings_json'] ?? '{}'),
+    ];
 }
 
 function fetch_schedule_cells(PDO $pdo, int $teamId, string $startDate, string $endDate): array

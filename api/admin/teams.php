@@ -157,12 +157,6 @@ function format_team_row(array $row): array
     ];
 }
 
-function decode_team_settings(?string $json): array
-{
-    $settings = decode_json_field($json, []);
-    return is_array($settings) ? $settings : [];
-}
-
 function read_json_payload(): array
 {
     $content = file_get_contents('php://input');
