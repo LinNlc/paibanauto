@@ -27,6 +27,9 @@ switch ($action) {
     case 'coverage_by_day':
         handle_coverage_by_day($pdo, $permissions);
         break;
+    case 'playlist_overview':
+        handle_playlist_overview($pdo, $permissions);
+        break;
     default:
         json_err('未知操作', 400);
 }
@@ -131,6 +134,58 @@ function handle_coverage_by_day(PDO $pdo, array $permissions): void
     ]);
 }
 
+function handle_playlist_overview(PDO $pdo, array $permissions): void
+{
+    if (!permissions_can_view_section($permissions, 'playlistschedule')) {
+        permission_denied();
+    }
+
+    $teamId = isset($_GET['team_id']) ? (int) $_GET['team_id'] : null;
+    $startParam = isset($_GET['start']) ? (string) $_GET['start'] : '';
+    $endParam = isset($_GET['end']) ? (string) $_GET['end'] : '';
+
+    [$startDate, $endDate] = resolve_date_range($startParam, $endParam);
+    $rangeDays = calculate_range_days($startDate, $endDate);
+
+    $teamRows = fetch_accessible_teams($pdo, $permissions);
+    $teams = normalize_team_rows($teamRows);
+
+    if ($teamId !== null && $teamId > 0 && !team_in_list($teams, $teamId)) {
+        permission_denied();
+    }
+
+    if ($teamId === null || $teamId <= 0) {
+        $teamId = $teams !== [] ? (int) $teams[0]['id'] : null;
+    }
+
+    if ($teamId === null) {
+        json_ok([
+            'teams' => $teams,
+            'team_id' => null,
+            'start' => $startDate,
+            'end' => $endDate,
+            'range_days' => $rangeDays,
+            'records' => [],
+            'daily' => [],
+        ]);
+        return;
+    }
+
+    $cells = playlist_fetch_cells($pdo, $teamId, $startDate, $endDate);
+    $person = playlist_person_stats($pdo, $teamId, $cells);
+    $daily = playlist_daily_stats($cells, $startDate, $endDate);
+
+    json_ok([
+        'teams' => $teams,
+        'team_id' => $teamId,
+        'start' => $startDate,
+        'end' => $endDate,
+        'range_days' => $rangeDays,
+        'records' => $person,
+        'daily' => $daily,
+    ]);
+}
+
 function resolve_date_range(string $start, string $end): array
 {
     $today = new DateTimeImmutable('today');
@@ -197,6 +252,99 @@ function fetch_accessible_teams(PDO $pdo, array $permissions): array
     $stmt->execute($allowed);
 
     return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+function playlist_person_stats(PDO $pdo, int $teamId, array $cells): array
+{
+    $map = playlist_employee_map($pdo, $teamId);
+    $stats = [];
+    foreach ($cells as $cell) {
+        $empId = $cell['emp_id'] ?? null;
+        if ($empId === null) {
+            continue;
+        }
+        if (!isset($stats[$empId])) {
+            $info = $map[$empId] ?? ['label' => '', 'name' => '', 'display_name' => ''];
+            $stats[$empId] = [
+                'emp_id' => $empId,
+                'name' => (string) ($info['name'] ?? ''),
+                'display_name' => (string) ($info['display_name'] ?? ''),
+                'label' => (string) ($info['label'] ?? ''),
+                'white' => 0,
+                'mid' => 0,
+                'total' => 0,
+            ];
+        }
+        if ($cell['shift'] === 'white') {
+            $stats[$empId]['white']++;
+        } elseif ($cell['shift'] === 'mid') {
+            $stats[$empId]['mid']++;
+        }
+        $stats[$empId]['total']++;
+    }
+
+    usort($stats, static function (array $a, array $b): int {
+        $labelA = trim((string) $a['label']);
+        $labelB = trim((string) $b['label']);
+        return strcmp($labelA, $labelB);
+    });
+
+    return array_values($stats);
+}
+
+function playlist_daily_stats(array $cells, string $startDate, string $endDate): array
+{
+    $days = playlist_build_day_range($startDate, $endDate);
+    $daily = [];
+    foreach ($days as $day) {
+        $daily[$day] = [
+            'day' => $day,
+            'weekday' => playlist_weekday_text($day),
+            'white' => 0,
+            'mid' => 0,
+            'total' => 0,
+        ];
+    }
+
+    foreach ($cells as $cell) {
+        $day = $cell['day'];
+        if (!isset($daily[$day])) {
+            $daily[$day] = [
+                'day' => $day,
+                'weekday' => playlist_weekday_text($day),
+                'white' => 0,
+                'mid' => 0,
+                'total' => 0,
+            ];
+        }
+        if ($cell['shift'] === 'white') {
+            $daily[$day]['white']++;
+        } elseif ($cell['shift'] === 'mid') {
+            $daily[$day]['mid']++;
+        }
+        $daily[$day]['total']++;
+    }
+
+    return array_values($daily);
+}
+
+function playlist_build_day_range(string $start, string $end): array
+{
+    $days = [];
+    $startDate = new DateTimeImmutable($start);
+    $endDate = new DateTimeImmutable($end);
+    for ($current = $startDate; $current <= $endDate; $current = $current->modify('+1 day')) {
+        $days[] = $current->format('Y-m-d');
+    }
+    return $days;
+}
+
+function playlist_weekday_text(string $day): string
+{
+    $date = new DateTimeImmutable($day);
+    $map = ['日', '一', '二', '三', '四', '五', '六'];
+    $index = (int) $date->format('w');
+    return '星期' . $map[$index];
 }
 
 function normalize_team_rows(array $rows): array

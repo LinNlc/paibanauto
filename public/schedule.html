@@ -8,8 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="./app.css?v=20240605" />
-    <script src="./app.js?v=20240605"></script>
+    <link rel="stylesheet" href="./app.css?v=20240610" />
+    <script src="./app.js?v=20240610"></script>
     <style>
       :root {
         --schedule-date-width: 168px;
@@ -567,7 +567,17 @@
           <nav>
             <a href="./index.html" data-view="home"><span class="nav-indicator"></span>首页</a>
             <a href="./people.html" data-view="people"><span class="nav-indicator"></span>人员管理</a>
-            <a href="./schedule.html" data-view="schedule" class="is-active"><span class="nav-indicator"></span>排班表</a>
+            <div class="nav-group" data-nav-group="schedule">
+              <a href="./schedule.html" data-view="schedule" class="nav-primary is-active"><span class="nav-indicator"></span>排班表</a>
+              <a
+                href="./playlist-schedule.html"
+                data-view="playlistschedule"
+                class="nav-secondary hidden"
+                data-subview="schedule"
+              >
+                <span class="nav-indicator"></span>播单专辑排班
+              </a>
+            </div>
             <a href="./stats.html" data-view="stats"><span class="nav-indicator"></span>数据统计</a>
             <a href="./admin.html" data-view="admin"><span class="nav-indicator"></span>权限设置</a>
           </nav>
@@ -1171,6 +1181,18 @@
         return allowedViews.includes(normalizedView);
       }
 
+      function refreshNavGroups() {
+        document.querySelectorAll('.nav-group').forEach((group) => {
+          const subLinks = group.querySelectorAll('.nav-secondary');
+          const hasVisibleSub = Array.from(subLinks).some((link) => !link.classList.contains('hidden'));
+          if (hasVisibleSub) {
+            group.classList.add('nav-group--with-sub');
+          } else {
+            group.classList.remove('nav-group--with-sub');
+          }
+        });
+      }
+
       function applyViewVisibility(user) {
         document.querySelectorAll('[data-view]').forEach((link) => {
           const requiredView = link.dataset.view ? link.dataset.view.toLowerCase() : '';
@@ -1183,6 +1205,7 @@
             link.classList.add('hidden');
           }
         });
+        refreshNavGroups();
       }
 
       const pendingUpdates = new Map();

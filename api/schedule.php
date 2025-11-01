@@ -336,26 +336,6 @@ function team_in_list(array $teams, int $teamId): bool
     return false;
 }
 
-function fetch_team_employees(PDO $pdo, int $teamId): array
-{
-    $stmt = $pdo->prepare('SELECT id, name, display_name, active, sort_order FROM employees WHERE team_id = :team ORDER BY sort_order ASC, id ASC');
-    $stmt->execute([':team' => $teamId]);
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-    $result = [];
-    foreach ($rows as $row) {
-        $result[] = [
-            'id' => (int) $row['id'],
-            'name' => (string) $row['name'],
-            'display_name' => (string) $row['display_name'],
-            'active' => (int) $row['active'] === 1,
-            'sort_order' => (int) $row['sort_order'],
-        ];
-    }
-
-    return $result;
-}
-
 function fetch_team_settings(PDO $pdo, int $teamId): ?array
 {
     $stmt = $pdo->prepare('SELECT id, name, settings_json FROM teams WHERE id = :id LIMIT 1');

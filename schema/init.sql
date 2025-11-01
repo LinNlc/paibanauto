@@ -53,6 +53,25 @@ CREATE TABLE IF NOT EXISTS schedule_cells (
 CREATE INDEX IF NOT EXISTS idx_schedule_cells_team_day ON schedule_cells (team_id, day);
 CREATE INDEX IF NOT EXISTS idx_schedule_cells_emp ON schedule_cells (emp_id);
 
+CREATE TABLE IF NOT EXISTS playlist_schedule_cells (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    team_id INTEGER NOT NULL,
+    day TEXT NOT NULL,
+    shift TEXT NOT NULL,
+    emp_id INTEGER,
+    emp_name TEXT NOT NULL DEFAULT '',
+    version INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by INTEGER,
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+    FOREIGN KEY (emp_id) REFERENCES employees(id) ON DELETE SET NULL,
+    FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
+    UNIQUE(team_id, day, shift)
+);
+
+CREATE INDEX IF NOT EXISTS idx_playlist_schedule_cells_team_day ON playlist_schedule_cells (team_id, day);
+CREATE INDEX IF NOT EXISTS idx_playlist_schedule_cells_emp ON playlist_schedule_cells (emp_id);
+
 CREATE TABLE IF NOT EXISTS ops_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     team_id INTEGER NOT NULL,

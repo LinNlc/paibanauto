@@ -360,6 +360,9 @@ function normalize_features($value): array
         'scheduleImportExport' => false,
         'scheduleAssistSettings' => false,
         'scheduleAi' => false,
+        'playlistFloatingBall' => false,
+        'playlistImportExport' => false,
+        'playlistAutoFill' => false,
     ];
 
     if (!is_array($value)) {
