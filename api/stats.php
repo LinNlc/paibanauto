@@ -178,13 +178,13 @@ function calculate_range_days(string $start, string $end): int
 function fetch_accessible_teams(PDO $pdo, array $permissions): array
 {
     if (($permissions['is_admin'] ?? false) === true) {
-        $stmt = $pdo->query('SELECT id, name FROM teams ORDER BY name ASC, id ASC');
+        $stmt = $pdo->query('SELECT id, name, settings_json FROM teams ORDER BY name ASC, id ASC');
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     $allowed = $permissions['allowed_teams'] ?? [];
     if ($allowed === null) {
-        $stmt = $pdo->query('SELECT id, name FROM teams ORDER BY name ASC, id ASC');
+        $stmt = $pdo->query('SELECT id, name, settings_json FROM teams ORDER BY name ASC, id ASC');
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
@@ -193,7 +193,7 @@ function fetch_accessible_teams(PDO $pdo, array $permissions): array
     }
 
     $placeholders = implode(', ', array_fill(0, count($allowed), '?'));
-    $stmt = $pdo->prepare('SELECT id, name FROM teams WHERE id IN (' . $placeholders . ') ORDER BY name ASC, id ASC');
+    $stmt = $pdo->prepare('SELECT id, name, settings_json FROM teams WHERE id IN (' . $placeholders . ') ORDER BY name ASC, id ASC');
     $stmt->execute($allowed);
 
     return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -206,6 +206,7 @@ function normalize_team_rows(array $rows): array
         $result[] = [
             'id' => (int) ($row['id'] ?? 0),
             'name' => (string) ($row['name'] ?? ''),
+            'settings' => decode_team_settings($row['settings_json'] ?? '{}'),
         ];
     }
 
