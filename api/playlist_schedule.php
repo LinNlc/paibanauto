@@ -78,6 +78,7 @@ function handle_playlist_get(): void
             'can_edit' => false,
             'user' => $user,
             'features' => playlist_feature_payload($permissions),
+            'on_duty' => new stdClass(),
         ]);
     }
 
@@ -113,6 +114,7 @@ function handle_playlist_get(): void
         'can_edit' => permissions_can_edit_team($permissions, $teamId),
         'user' => $user,
         'features' => playlist_feature_payload($permissions),
+        'on_duty' => playlist_fetch_on_duty($pdo, $teamId, $startDate, $endDate),
     ]);
 }
 
@@ -200,9 +202,17 @@ function handle_playlist_auto_fill(array $payload): void
     $endParam = isset($payload['end']) ? (string) $payload['end'] : '';
     [$startDate, $endDate] = playlist_resolve_date_range($startParam, $endParam);
 
-    $whiteDuration = isset($payload['white_duration']) ? (int) $payload['white_duration'] : 1;
-    $midDuration = isset($payload['mid_duration']) ? (int) $payload['mid_duration'] : 1;
-    $maxDiff = isset($payload['max_diff']) ? (int) $payload['max_diff'] : 0;
+    $whiteDuration = playlist_normalize_fraction($payload['white_duration'] ?? null);
+    $midDuration = playlist_normalize_fraction($payload['mid_duration'] ?? null);
+    $maxDiff = playlist_normalize_fraction($payload['max_diff'] ?? null);
+
+    if ($whiteDuration < 0.0 || $whiteDuration > 1.0 || $midDuration < 0.0 || $midDuration > 1.0) {
+        json_err('班次时长需在 0 至 1 之间', 422);
+    }
+
+    if ($maxDiff < 0.0 || $maxDiff > 1.0) {
+        json_err('最大差值需在 0 至 1 之间', 422);
+    }
     $empList = normalize_id_list($payload['emp_ids'] ?? []);
 
     if ($empList === []) {
@@ -220,8 +230,8 @@ function handle_playlist_auto_fill(array $payload): void
 
     $days = playlist_generate_days($startDate, $endDate);
 
-    $whiteAssignments = playlist_generate_assignments($days, $employees, max($whiteDuration, 1), $maxDiff, []);
-    $midAssignments = playlist_generate_assignments($days, $employees, max($midDuration, 1), $maxDiff, $whiteAssignments);
+    $whiteAssignments = playlist_generate_assignments($days, $employees, max($whiteDuration, 0.0), $maxDiff, []);
+    $midAssignments = playlist_generate_assignments($days, $employees, max($midDuration, 0.0), $maxDiff, $whiteAssignments);
 
     $pdo->beginTransaction();
     try {
@@ -264,6 +274,7 @@ function handle_playlist_auto_fill(array $payload): void
 
     json_ok([
         'cells' => $grid,
+        'on_duty' => playlist_fetch_on_duty($pdo, $teamId, $startDate, $endDate),
     ]);
 }
 
@@ -406,6 +417,7 @@ function handle_playlist_import(): void
         'start' => $startDate,
         'end' => $endDate,
         'cells' => $grid,
+        'on_duty' => playlist_fetch_on_duty($pdo, $teamId, $startDate, $endDate),
     ]);
 }
 
@@ -568,6 +580,37 @@ function playlist_team_in_list(array $teams, int $teamId): bool
     return false;
 }
 
+function playlist_fetch_on_duty(PDO $pdo, int $teamId, string $startDate, string $endDate): array
+{
+    $stmt = $pdo->prepare('SELECT day, emp_id, value FROM schedule_cells WHERE team_id = :team AND day >= :start AND day <= :end');
+    $stmt->execute([
+        ':team' => $teamId,
+        ':start' => $startDate,
+        ':end' => $endDate,
+    ]);
+
+    $result = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $day = (string) ($row['day'] ?? '');
+        $empId = isset($row['emp_id']) ? (int) $row['emp_id'] : 0;
+        if ($day === '' || $empId <= 0) {
+            continue;
+        }
+        $value = trim((string) ($row['value'] ?? ''));
+        if ($value === '' || $value === '休息') {
+            continue;
+        }
+        if (!isset($result[$day])) {
+            $result[$day] = [];
+        }
+        if (!in_array($empId, $result[$day], true)) {
+            $result[$day][] = $empId;
+        }
+    }
+
+    return $result;
+}
+
 function playlist_employee_belongs_to_team(PDO $pdo, int $employeeId, int $teamId): bool
 {
     $stmt = $pdo->prepare('SELECT 1 FROM employees WHERE id = :id AND team_id = :team LIMIT 1');
@@ -588,6 +631,25 @@ function playlist_feature_payload(array $permissions): array
     ];
 }
 
+function playlist_normalize_fraction($value): float
+{
+    if (is_string($value) || is_numeric($value)) {
+        $number = (float) $value;
+        if (is_finite($number)) {
+            $rounded = round($number, 2);
+            if ($rounded < 0.0) {
+                return 0.0;
+            }
+            if ($rounded > 1.0) {
+                return 1.0;
+            }
+            return $rounded;
+        }
+    }
+
+    return 0.0;
+}
+
 function playlist_generate_days(string $startDate, string $endDate): array
 {
     $start = new DateTimeImmutable($startDate);
@@ -599,7 +661,7 @@ function playlist_generate_days(string $startDate, string $endDate): array
     return $days;
 }
 
-function playlist_generate_assignments(array $days, array $employees, int $duration, int $maxDiff, array $avoidSameDay): array
+function playlist_generate_assignments(array $days, array $employees, float $duration, float $maxDiff, array $avoidSameDay): array
 {
     $order = [];
     foreach ($employees as $index => $emp) {
