@@ -19,14 +19,83 @@ function db(): PDO
     }
 
     $config = app_config();
-    $dsn = 'sqlite:' . $config['db_path'];
+    $dbPath = (string)($config['db_path'] ?? '');
+    if ($dbPath === '') {
+        throw new RuntimeException('database path is not configured');
+    }
+
+    $dir = dirname($dbPath);
+    if ($dir !== '' && !is_dir($dir)) {
+        if (!mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new RuntimeException('failed to create database directory');
+        }
+    }
+
+    $dsn = 'sqlite:' . $dbPath;
     $pdo = new PDO($dsn, null, null, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
     ]);
 
+    ensure_schema_up_to_date($pdo);
+
     return $pdo;
+}
+
+function ensure_schema_up_to_date(PDO $pdo): void
+{
+    static $applied = false;
+    if ($applied) {
+        return;
+    }
+
+    $pdo->exec('PRAGMA foreign_keys = ON');
+
+    ensure_table_column($pdo, 'teams', 'settings_json', "ALTER TABLE teams ADD COLUMN settings_json TEXT DEFAULT '{}'");
+
+    ensure_table_column($pdo, 'users', 'display_name', "ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT ''");
+    ensure_table_column($pdo, 'users', 'role', "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
+    ensure_table_column($pdo, 'users', 'allowed_teams_json', "ALTER TABLE users ADD COLUMN allowed_teams_json TEXT DEFAULT '[]'");
+    ensure_table_column($pdo, 'users', 'allowed_views_json', "ALTER TABLE users ADD COLUMN allowed_views_json TEXT DEFAULT '[]'");
+    ensure_table_column($pdo, 'users', 'editable_teams_json', "ALTER TABLE users ADD COLUMN editable_teams_json TEXT DEFAULT '[]'");
+    ensure_table_column($pdo, 'users', 'features_json', "ALTER TABLE users ADD COLUMN features_json TEXT DEFAULT '{}'");
+    ensure_table_column($pdo, 'users', 'disabled', "ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0");
+
+    $applied = true;
+}
+
+function ensure_table_column(PDO $pdo, string $table, string $column, string $ddl): void
+{
+    if (table_has_column($pdo, $table, $column)) {
+        return;
+    }
+
+    $pdo->exec($ddl);
+}
+
+function table_has_column(PDO $pdo, string $table, string $column): bool
+{
+    if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $table)) {
+        throw new InvalidArgumentException('invalid table name');
+    }
+    if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $column)) {
+        throw new InvalidArgumentException('invalid column name');
+    }
+
+    $stmt = $pdo->query('PRAGMA table_info(' . $table . ')');
+    if ($stmt === false) {
+        return false;
+    }
+
+    $columns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($columns as $info) {
+        if (isset($info['name']) && strcasecmp((string) $info['name'], $column) === 0) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function json_ok(array $data = []): void
