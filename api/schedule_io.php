@@ -48,9 +48,8 @@ function ensure_import_export_permission(array $permissions): void
 function deliver_template_workbook(): void
 {
     $rows = [
-        ['日期', '员工ID', '姓名', '班次'],
-        ['2024-01-01', '1001', '张三', '白'],
-        ['2024-01-01', '1002', '李四', '中1'],
+        ['日期', '示例：张三', '示例：李四'],
+        ['2024-01-01', '白', '中1'],
     ];
 
     $content = build_workbook($rows);
@@ -108,7 +107,7 @@ function handle_import(PDO $pdo, array $user, array $permissions): void
     }
 
     $header = array_map('trim', $rows[0]);
-    if ($header[0] !== '日期' || $header[1] !== '员工ID' || $header[3] !== '班次') {
+    if (($header[0] ?? '') !== '日期') {
         json_err('模板格式不正确，请使用系统提供的模板', 422);
     }
 
@@ -116,9 +115,58 @@ function handle_import(PDO $pdo, array $user, array $permissions): void
     if ($employees === []) {
         json_err('该团队暂无员工数据', 404);
     }
-    $employeeMap = [];
+    $normalizeName = static function (string $value): string {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        if (function_exists('mb_strtolower')) {
+            return mb_strtolower($trimmed, 'UTF-8');
+        }
+
+        return strtolower($trimmed);
+    };
+
+    $nameIndex = [];
     foreach ($employees as $employee) {
-        $employeeMap[$employee['id']] = $employee;
+        $candidates = [];
+        if (isset($employee['display_name']) && trim((string) $employee['display_name']) !== '') {
+            $candidates[] = trim((string) $employee['display_name']);
+        }
+        if (isset($employee['name']) && trim((string) $employee['name']) !== '') {
+            $candidates[] = trim((string) $employee['name']);
+        }
+        foreach ($candidates as $candidate) {
+            $key = $normalizeName($candidate);
+            if ($key !== '' && !isset($nameIndex[$key])) {
+                $nameIndex[$key] = (int) $employee['id'];
+            }
+        }
+    }
+
+    $columnMap = [];
+    $usedEmployees = [];
+    $headerCount = count($header);
+    for ($col = 1; $col < $headerCount; $col++) {
+        $rawName = trim((string) ($header[$col] ?? ''));
+        if ($rawName === '') {
+            continue;
+        }
+        $key = $normalizeName($rawName);
+        if ($key === '' || !isset($nameIndex[$key])) {
+            json_err('无法匹配人员列：' . $rawName, 422);
+        }
+        $empId = $nameIndex[$key];
+        if (isset($usedEmployees[$empId])) {
+            json_err('导入文件中存在重复的人员列：' . $rawName, 422);
+        }
+        $columnMap[$col] = $empId;
+        $usedEmployees[$empId] = true;
+    }
+
+    if ($columnMap === []) {
+        json_err('未识别到任何人员列', 422);
     }
 
     $updates = [];
@@ -131,20 +179,18 @@ function handle_import(PDO $pdo, array $user, array $permissions): void
         if ($date === null) {
             continue;
         }
-        $empId = isset($row[1]) ? (int) $row[1] : 0;
-        if ($empId <= 0 || !isset($employeeMap[$empId])) {
-            continue;
+        foreach ($columnMap as $colIndex => $empId) {
+            $valueRaw = $row[$colIndex] ?? '';
+            $value = normalize_shift_value($valueRaw);
+            if ($value === null) {
+                continue;
+            }
+            $updates[] = [
+                'day' => $date,
+                'emp_id' => $empId,
+                'value' => $value,
+            ];
         }
-        $valueRaw = $row[3] ?? '';
-        $value = normalize_shift_value($valueRaw);
-        if ($value === null) {
-            continue;
-        }
-        $updates[] = [
-            'day' => $date,
-            'emp_id' => $empId,
-            'value' => $value,
-        ];
     }
 
     if ($updates === []) {
@@ -231,17 +277,31 @@ function fetch_schedule_cells_for_range(PDO $pdo, int $teamId, string $start, st
 
 function build_export_rows(array $employees, array $cells, string $start, string $end): array
 {
-    $rows = [['日期', '员工ID', '姓名', '班次']];
+    $headers = ['日期'];
+    $orderedEmployees = [];
+    foreach ($employees as $employee) {
+        $label = (string) ($employee['display_name'] ?? '');
+        if ($label === '') {
+            $label = (string) ($employee['name'] ?? '');
+        }
+        if ($label === '') {
+            $label = '员工 #' . $employee['id'];
+        }
+        $headers[] = $label;
+        $orderedEmployees[] = $employee;
+    }
+
+    $rows = [$headers];
     $cursor = new DateTimeImmutable($start);
     $endDate = new DateTimeImmutable($end);
 
     while ($cursor <= $endDate) {
         $day = $cursor->format('Y-m-d');
-        foreach ($employees as $employee) {
-            $value = $cells[$day][$employee['id']] ?? '';
-            $name = $employee['display_name'] !== '' ? $employee['display_name'] : $employee['name'];
-            $rows[] = [$day, $employee['id'], $name, $value];
+        $row = [$day];
+        foreach ($orderedEmployees as $employee) {
+            $row[] = $cells[$day][$employee['id']] ?? '';
         }
+        $rows[] = $row;
         $cursor = $cursor->modify('+1 day');
     }
 
@@ -299,14 +359,10 @@ function generate_sheet_xml(array $rows): string
         $excelRow = $rowIndex + 1;
         $xml[] = '<row r="' . $excelRow . '">';
         foreach ($row as $colIndex => $cell) {
-            $columnLetter = chr(ord('A') + $colIndex);
+            $columnLetter = column_index_to_name($colIndex + 1);
             $ref = $columnLetter . $excelRow;
-            if ($colIndex === 1 && $rowIndex > 0 && $cell !== '') {
-                $xml[] = '<c r="' . $ref . '"><v>' . (int) $cell . '</v></c>';
-            } else {
-                $escaped = htmlspecialchars((string) $cell, ENT_QUOTES | ENT_XML1, 'UTF-8');
-                $xml[] = '<c r="' . $ref . '" t="inlineStr"><is><t>' . $escaped . '</t></is></c>';
-            }
+            $escaped = htmlspecialchars((string) $cell, ENT_QUOTES | ENT_XML1, 'UTF-8');
+            $xml[] = '<c r="' . $ref . '" t="inlineStr"><is><t>' . $escaped . '</t></is></c>';
         }
         $xml[] = '</row>';
     }
@@ -374,18 +430,58 @@ function parse_workbook_rows(string $path): array
         $cells = [];
         foreach ($rowNode->getElementsByTagName('c') as $cellNode) {
             $type = $cellNode->getAttribute('t');
+            $ref = $cellNode->getAttribute('r');
+            $colIndex = column_name_to_index($ref);
+            if ($colIndex <= 0) {
+                $colIndex = count($cells) + 1;
+            }
+            while (count($cells) < $colIndex - 1) {
+                $cells[] = '';
+            }
             if ($type === 'inlineStr') {
                 $textNode = $cellNode->getElementsByTagName('t')->item(0);
-                $cells[] = $textNode ? $textNode->textContent : '';
+                $cells[$colIndex - 1] = $textNode ? $textNode->textContent : '';
             } else {
                 $valueNode = $cellNode->getElementsByTagName('v')->item(0);
-                $cells[] = $valueNode ? $valueNode->textContent : '';
+                $cells[$colIndex - 1] = $valueNode ? $valueNode->textContent : '';
             }
         }
         $rows[] = $cells;
     }
 
     return $rows;
+}
+
+function column_index_to_name(int $index): string
+{
+    $name = '';
+    while ($index > 0) {
+        $index--;
+        $name = chr(65 + ($index % 26)) . $name;
+        $index = intdiv($index, 26);
+    }
+
+    return $name;
+}
+
+function column_name_to_index(string $ref): int
+{
+    if ($ref === '') {
+        return 0;
+    }
+
+    if (preg_match('/^([A-Z]+)/i', $ref, $matches)) {
+        $letters = strtoupper($matches[1]);
+        $index = 0;
+        $length = strlen($letters);
+        for ($i = 0; $i < $length; $i++) {
+            $index = $index * 26 + (ord($letters[$i]) - 64);
+        }
+
+        return $index;
+    }
+
+    return 0;
 }
 
 function apply_schedule_value(PDO $pdo, array $user, int $teamId, int $employeeId, string $day, string $value): array
