@@ -1041,6 +1041,36 @@
         return state.employees.filter((emp) => allowedSet.has(Number(emp.id)) && rosterSet.has(Number(emp.id)));
       }
 
+      function normalizeAutoWarnings(raw) {
+        if (!raw) {
+          return [];
+        }
+        if (Array.isArray(raw)) {
+          return raw.map((item) => String(item)).filter((text) => text.trim() !== '');
+        }
+        if (typeof raw !== 'object') {
+          return [];
+        }
+        const messages = [];
+        if (Array.isArray(raw.missing_days)) {
+          raw.missing_days.forEach((day) => {
+            const text = String(day || '').trim();
+            if (text) {
+              messages.push(`${text}（无在岗人员）`);
+            }
+          });
+        }
+        if (Array.isArray(raw.empty_shifts)) {
+          raw.empty_shifts.forEach((shift) => {
+            const text = String(shift || '').trim();
+            if (text) {
+              messages.push(`${text}（未分配）`);
+            }
+          });
+        }
+        return messages;
+      }
+
       function normalizeViewList(list) {
         if (!Array.isArray(list)) {
           return [];
@@ -1543,7 +1573,12 @@
             elements.endInput.value = state.end;
             renderRangeInfo();
             renderTable();
-            App.toast('自动排班完成', { type: 'success' });
+            const warningMessages = normalizeAutoWarnings(result.warnings);
+            if (warningMessages.length) {
+              App.toast(`自动排班完成，但以下班次仍为空：${warningMessages.join('、')}`, { type: 'warning' });
+            } else {
+              App.toast('自动排班完成', { type: 'success' });
+            }
             updateFloatingBall();
           }
         } catch (error) {
