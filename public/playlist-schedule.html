@@ -1034,11 +1034,66 @@
         return rounded;
       }
 
-      function getEligibleEmployeesForDay(day) {
-        const allowedSet = new Set(state.selectedEmpIds.map((id) => Number(id)));
+      function getPickerEmployeeSets(day) {
         const roster = Array.isArray(state.onDuty[day]) ? state.onDuty[day] : [];
         const rosterSet = new Set(roster.map((id) => Number(id)));
-        return state.employees.filter((emp) => allowedSet.has(Number(emp.id)) && rosterSet.has(Number(emp.id)));
+        const hasRoster = rosterSet.size > 0;
+        const selectedSet = new Set(state.selectedEmpIds.map((id) => Number(id)));
+        const allowAll = selectedSet.size === 0;
+        const primary = [];
+        const fallback = [];
+
+        state.employees.forEach((emp) => {
+          const empId = Number(emp.id);
+          if (!Number.isFinite(empId) || empId <= 0) {
+            return;
+          }
+          if (!allowAll && !selectedSet.has(empId)) {
+            return;
+          }
+          if (!hasRoster || rosterSet.has(empId)) {
+            primary.push(emp);
+          } else {
+            fallback.push(emp);
+          }
+        });
+
+        return { primary, fallback };
+      }
+
+      function getEligibleEmployeesForDay(day) {
+        const { primary, fallback } = getPickerEmployeeSets(day);
+        return primary.length ? primary : fallback;
+      }
+
+      function normalizeAutoWarnings(raw) {
+        if (!raw) {
+          return [];
+        }
+        if (Array.isArray(raw)) {
+          return raw.map((item) => String(item)).filter((text) => text.trim() !== '');
+        }
+        if (typeof raw !== 'object') {
+          return [];
+        }
+        const messages = [];
+        if (Array.isArray(raw.missing_days)) {
+          raw.missing_days.forEach((day) => {
+            const text = String(day || '').trim();
+            if (text) {
+              messages.push(`${text}（无在岗人员）`);
+            }
+          });
+        }
+        if (Array.isArray(raw.empty_shifts)) {
+          raw.empty_shifts.forEach((shift) => {
+            const text = String(shift || '').trim();
+            if (text) {
+              messages.push(`${text}（未分配）`);
+            }
+          });
+        }
+        return messages;
       }
 
       function normalizeAutoWarnings(raw) {
@@ -1274,9 +1329,12 @@
         emptyOption.value = '';
         emptyOption.textContent = '未分配';
         elements.pickerSelect.appendChild(emptyOption);
-        const eligible = getEligibleEmployeesForDay(day);
+        const { primary, fallback } = getPickerEmployeeSets(day);
+        const eligible = primary.length ? primary : fallback;
         const eligibleIds = new Set(eligible.map((emp) => Number(emp.id)));
-        if (current && current.emp_id && !eligibleIds.has(Number(current.emp_id))) {
+        const fallbackIds = new Set(fallback.map((emp) => Number(emp.id)));
+        const combinedIds = new Set([...eligibleIds, ...fallbackIds]);
+        if (current && current.emp_id && !combinedIds.has(Number(current.emp_id))) {
           const fallbackOption = document.createElement('option');
           fallbackOption.value = String(current.emp_id);
           fallbackOption.textContent = `${employeeLabel({ id: current.emp_id, emp_display: current.emp_display, emp_name: current.emp_name })}（不在名单）`;
@@ -1301,6 +1359,22 @@
           placeholder.textContent = '暂无符合条件的人员';
           placeholder.disabled = true;
           elements.pickerSelect.appendChild(placeholder);
+        }
+        if (primary.length && fallback.length) {
+          const separator = document.createElement('option');
+          separator.value = '__divider';
+          separator.textContent = '──────────';
+          separator.disabled = true;
+          elements.pickerSelect.appendChild(separator);
+          fallback.forEach((emp) => {
+            const option = document.createElement('option');
+            option.value = String(emp.id);
+            option.textContent = `${employeeLabel(emp)}（不在排班日历）`;
+            if (current && Number(current.emp_id) === Number(emp.id)) {
+              option.selected = true;
+            }
+            elements.pickerSelect.appendChild(option);
+          });
         }
       }
 
