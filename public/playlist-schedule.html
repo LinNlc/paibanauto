@@ -1096,36 +1096,6 @@
         return messages;
       }
 
-      function normalizeAutoWarnings(raw) {
-        if (!raw) {
-          return [];
-        }
-        if (Array.isArray(raw)) {
-          return raw.map((item) => String(item)).filter((text) => text.trim() !== '');
-        }
-        if (typeof raw !== 'object') {
-          return [];
-        }
-        const messages = [];
-        if (Array.isArray(raw.missing_days)) {
-          raw.missing_days.forEach((day) => {
-            const text = String(day || '').trim();
-            if (text) {
-              messages.push(`${text}（无在岗人员）`);
-            }
-          });
-        }
-        if (Array.isArray(raw.empty_shifts)) {
-          raw.empty_shifts.forEach((shift) => {
-            const text = String(shift || '').trim();
-            if (text) {
-              messages.push(`${text}（未分配）`);
-            }
-          });
-        }
-        return messages;
-      }
-
       function normalizeViewList(list) {
         if (!Array.isArray(list)) {
           return [];
