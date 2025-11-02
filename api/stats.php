@@ -167,13 +167,15 @@ function handle_playlist_overview(PDO $pdo, array $permissions): void
             'range_days' => $rangeDays,
             'records' => [],
             'daily' => [],
+            'playlist_settings' => playlist_default_settings(),
         ]);
         return;
     }
 
     $cells = playlist_fetch_cells($pdo, $teamId, $startDate, $endDate);
-    $person = playlist_person_stats($pdo, $teamId, $cells);
-    $daily = playlist_daily_stats($cells, $startDate, $endDate);
+    $playlistSettings = playlist_load_settings($pdo, $teamId);
+    $person = playlist_person_stats($pdo, $teamId, $cells, $playlistSettings);
+    $daily = playlist_daily_stats($cells, $startDate, $endDate, $playlistSettings);
 
     json_ok([
         'teams' => $teams,
@@ -183,6 +185,7 @@ function handle_playlist_overview(PDO $pdo, array $permissions): void
         'range_days' => $rangeDays,
         'records' => $person,
         'daily' => $daily,
+        'playlist_settings' => $playlistSettings,
     ]);
 }
 
@@ -254,10 +257,12 @@ function fetch_accessible_teams(PDO $pdo, array $permissions): array
     return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 
-function playlist_person_stats(PDO $pdo, int $teamId, array $cells): array
+function playlist_person_stats(PDO $pdo, int $teamId, array $cells, array $settings): array
 {
     $map = playlist_employee_map($pdo, $teamId);
     $stats = [];
+    $whiteDuration = (float) ($settings['white_duration'] ?? 0.0);
+    $midDuration = (float) ($settings['mid_duration'] ?? 0.0);
     foreach ($cells as $cell) {
         $empId = $cell['emp_id'] ?? null;
         if ($empId === null) {
@@ -276,11 +281,18 @@ function playlist_person_stats(PDO $pdo, int $teamId, array $cells): array
             ];
         }
         if ($cell['shift'] === 'white') {
-            $stats[$empId]['white']++;
+            $stats[$empId]['white'] += $whiteDuration;
         } elseif ($cell['shift'] === 'mid') {
-            $stats[$empId]['mid']++;
+            $stats[$empId]['mid'] += $midDuration;
         }
-        $stats[$empId]['total']++;
+    }
+
+    foreach ($stats as $empId => $row) {
+        $white = round((float) $row['white'], 2);
+        $mid = round((float) $row['mid'], 2);
+        $stats[$empId]['white'] = $white;
+        $stats[$empId]['mid'] = $mid;
+        $stats[$empId]['total'] = round($white + $mid, 2);
     }
 
     usort($stats, static function (array $a, array $b): int {
@@ -292,17 +304,18 @@ function playlist_person_stats(PDO $pdo, int $teamId, array $cells): array
     return array_values($stats);
 }
 
-function playlist_daily_stats(array $cells, string $startDate, string $endDate): array
+function playlist_daily_stats(array $cells, string $startDate, string $endDate, array $settings): array
 {
     $days = playlist_build_day_range($startDate, $endDate);
     $daily = [];
+    $whiteDuration = (float) ($settings['white_duration'] ?? 0.0);
+    $midDuration = (float) ($settings['mid_duration'] ?? 0.0);
     foreach ($days as $day) {
         $daily[$day] = [
             'day' => $day,
             'weekday' => playlist_weekday_text($day),
             'white' => 0,
             'mid' => 0,
-            'total' => 0,
         ];
     }
 
@@ -318,11 +331,18 @@ function playlist_daily_stats(array $cells, string $startDate, string $endDate):
             ];
         }
         if ($cell['shift'] === 'white') {
-            $daily[$day]['white']++;
+            $daily[$day]['white'] += $whiteDuration;
         } elseif ($cell['shift'] === 'mid') {
-            $daily[$day]['mid']++;
+            $daily[$day]['mid'] += $midDuration;
         }
-        $daily[$day]['total']++;
+    }
+
+    foreach ($daily as $day => $row) {
+        $white = round((float) $row['white'], 2);
+        $mid = round((float) $row['mid'], 2);
+        $daily[$day]['white'] = $white;
+        $daily[$day]['mid'] = $mid;
+        $daily[$day]['total'] = round($white + $mid, 2);
     }
 
     return array_values($daily);
