@@ -965,6 +965,8 @@
       };
       const FAB_POSITION_STORAGE_KEY = 'paiban:schedule-fab-position';
       const FAB_MIN_MARGIN = 16;
+      const AUTO_SNAPSHOT_PREFIX = 'auto:snapshot:';
+      const AUTO_SNAPSHOT_MAX_AGE = 2 * 60 * 60 * 1000;
       const ASSIST_METRICS = ['total', 'white', 'mid1', 'mid2', 'night'];
       const ASSIST_THRESHOLD_CONTROL_MAP = {
         total: {
@@ -1490,7 +1492,7 @@
               App.toast('暂无权限使用该功能');
               return;
             }
-            App.toast('AI 排班功能即将上线，敬请期待。', { type: 'success', duration: 2600 });
+            openAutoSchedulerWindow();
           });
         }
 
@@ -3504,6 +3506,141 @@
       function getEmployeeName(empId) {
         const emp = state.employees.find((item) => item.id === empId);
         return emp ? emp.display_name || emp.name || `成员#${emp.id}` : `成员#${empId}`;
+      }
+
+      function openAutoSchedulerWindow() {
+        let targetUrl = '/auto/public/auto-scheduler.html';
+        try {
+          const base = typeof URL === 'function' ? new URL(targetUrl, window.location.origin) : null;
+          if (base) {
+            if (state.teamId) {
+              base.searchParams.set('team_id', state.teamId);
+            }
+            if (state.start) {
+              base.searchParams.set('start_date', state.start);
+            }
+            if (state.end) {
+              base.searchParams.set('end_date', state.end);
+            }
+            const snapshotId = storeAutoSnapshot();
+            if (snapshotId) {
+              base.searchParams.set('snapshot', snapshotId);
+            }
+            targetUrl = base.toString();
+          }
+        } catch (error) {
+          console.warn('自动排班链接组装失败', error);
+        }
+        const win = window.open(targetUrl, '_blank', 'noopener');
+        if (win) {
+          win.opener = null;
+        } else {
+          window.location.href = targetUrl;
+        }
+      }
+
+      function storeAutoSnapshot() {
+        const storage = getAutoSnapshotStorage();
+        if (!storage) {
+          return null;
+        }
+        const snapshot = buildAutoSnapshot();
+        if (!snapshot) {
+          return null;
+        }
+        purgeAutoSnapshots();
+        const snapshotId = `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+        const storageKey = `${AUTO_SNAPSHOT_PREFIX}${snapshotId}`;
+        try {
+          storage.setItem(
+            storageKey,
+            JSON.stringify({ created_at: Date.now(), payload: snapshot })
+          );
+          return snapshotId;
+        } catch (error) {
+          console.warn('自动排班快照保存失败', error);
+          try {
+            storage.removeItem(storageKey);
+          } catch (removeError) {
+            console.warn('自动排班快照回滚失败', removeError);
+          }
+        }
+        return null;
+      }
+
+      function purgeAutoSnapshots() {
+        const storage = getAutoSnapshotStorage();
+        if (!storage) {
+          return;
+        }
+        const keys = [];
+        for (let i = 0; i < storage.length; i += 1) {
+          const key = storage.key(i);
+          if (key && key.startsWith(AUTO_SNAPSHOT_PREFIX)) {
+            keys.push(key);
+          }
+        }
+        if (!keys.length) {
+          return;
+        }
+        const now = Date.now();
+        keys.forEach((key) => {
+          try {
+            const raw = storage.getItem(key);
+            if (!raw) {
+              storage.removeItem(key);
+              return;
+            }
+            const parsed = JSON.parse(raw);
+            const created = Number(parsed && parsed.created_at);
+            if (!Number.isFinite(created) || now - created > AUTO_SNAPSHOT_MAX_AGE) {
+              storage.removeItem(key);
+            }
+          } catch (error) {
+            try {
+              storage.removeItem(key);
+            } catch (removeError) {
+              console.warn('自动排班快照清理失败', removeError);
+            }
+          }
+        });
+      }
+
+      function getAutoSnapshotStorage() {
+        if (typeof window === 'undefined') {
+          return null;
+        }
+        try {
+          return window.localStorage || null;
+        } catch (error) {
+          console.warn('自动排班快照存储不可用', error);
+          return null;
+        }
+      }
+
+      function buildAutoSnapshot() {
+        if (!Array.isArray(state.employees) || !state.employees.length) {
+          return null;
+        }
+        const employees = state.employees
+          .map((emp) => {
+            const id = Number(emp && (emp.id ?? emp.emp_id));
+            if (!Number.isFinite(id) || id <= 0) {
+              return null;
+            }
+            const label = emp.display_name || emp.name || emp.emp_name || '';
+            return { id, label };
+          })
+          .filter(Boolean);
+        if (!employees.length) {
+          return null;
+        }
+        return {
+          teamId: state.teamId || null,
+          startDate: state.start || null,
+          endDate: state.end || null,
+          employees,
+        };
       }
 
       function addDays(date, days) {

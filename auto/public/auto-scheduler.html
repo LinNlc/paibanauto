@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>自动排班助手</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: rgba(29, 41, 57, 0.92);
+      --panel: rgba(255, 255, 255, 0.08);
+      --accent: #38bdf8;
+      --accent-dark: #0ea5e9;
+      --text: #f8fafc;
+      --muted: #cbd5f5;
+      --border: rgba(148, 163, 184, 0.3);
+      --shadow: 0 20px 45px rgba(15, 23, 42, 0.3);
+    }
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #0f172a 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .auto-shell {
+      width: 90vw;
+      max-width: 1280px;
+      background: rgba(15, 23, 42, 0.85);
+      border-radius: 26px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(18px);
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      overflow: hidden;
+    }
+    .auto-sidebar {
+      padding: 28px 32px 36px;
+      border-right: 1px solid rgba(148, 163, 184, 0.2);
+      background: linear-gradient(160deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.75) 60%);
+    }
+    .auto-main {
+      padding: 30px 36px 40px;
+      position: relative;
+    }
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .subtitle {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .input-group {
+      margin-top: 22px;
+      display: grid;
+      gap: 16px;
+    }
+    label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    input, textarea, select {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(94, 126, 177, 0.4);
+      border-radius: 12px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 14px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      font-family: inherit;
+      resize: vertical;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+    }
+    textarea {
+      min-height: 86px;
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 26px;
+      flex-wrap: wrap;
+    }
+    button {
+      border-radius: 999px;
+      border: none;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #0f172a;
+      background: var(--accent);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+    button:hover {
+      transform: translateY(-1px);
+      background: var(--accent-dark);
+      box-shadow: 0 10px 22px rgba(14, 165, 233, 0.25);
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .ghost {
+      background: rgba(148, 163, 184, 0.18);
+      color: var(--muted);
+    }
+    .ghost:hover {
+      background: rgba(148, 163, 184, 0.28);
+      color: #f1f5f9;
+    }
+    .progress-wrap {
+      margin-top: 24px;
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px solid rgba(94, 126, 177, 0.28);
+      border-radius: 16px;
+      padding: 18px 20px;
+      display: grid;
+      gap: 16px;
+    }
+    .progress-bar {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(71, 85, 105, 0.4);
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-bar span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), #6366f1);
+      width: 0;
+      transition: width 0.4s ease;
+    }
+    .steps {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .step {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: rgba(148, 163, 184, 0.16);
+      color: rgba(226, 232, 240, 0.75);
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    .step.active {
+      background: rgba(14, 165, 233, 0.35);
+      color: #f8fafc;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+    }
+    .score-panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 18px;
+    }
+    .score-card {
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(30, 41, 59, 0.65);
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      display: grid;
+      gap: 6px;
+      position: relative;
+      overflow: hidden;
+    }
+    .score-card::after {
+      content: '';
+      position: absolute;
+      inset: -20% -40% auto auto;
+      height: 120px;
+      width: 120px;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.35), transparent 70%);
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    .score-card.glow::after {
+      opacity: 1;
+    }
+    .score-label {
+      font-size: 12px;
+      color: rgba(148, 163, 184, 0.8);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+    .score-value {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+    .preview {
+      margin-top: 28px;
+      display: grid;
+      gap: 18px;
+    }
+    .grid-scroll {
+      max-height: 360px;
+      overflow: auto;
+      border-radius: 18px;
+      border: 1px solid rgba(94, 126, 177, 0.26);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      background: rgba(15, 23, 42, 0.75);
+    }
+    th, td {
+      padding: 10px 12px;
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      text-align: center;
+    }
+    th {
+      background: rgba(30, 41, 59, 0.9);
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    td.rest {
+      color: #fda4af;
+      font-weight: 600;
+    }
+    td.mid1 {
+      color: #38bdf8;
+      font-weight: 600;
+    }
+    .violations {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(220, 38, 38, 0.08);
+      border: 1px solid rgba(248, 113, 113, 0.25);
+      color: #fecaca;
+      display: none;
+    }
+    .violations.active {
+      display: block;
+    }
+    .violations ul {
+      margin: 8px 0 0;
+      padding-left: 18px;
+    }
+    .timeline {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .timeline-chip {
+      border-radius: 12px;
+      padding: 6px 10px;
+      font-size: 12px;
+      background: rgba(148, 163, 184, 0.14);
+      color: rgba(226, 232, 240, 0.85);
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 6px 12px;
+      background: rgba(56, 189, 248, 0.18);
+      color: var(--text);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="auto-shell">
+    <aside class="auto-sidebar">
+      <h1>自动排班悬浮窗</h1>
+      <p class="subtitle">配置窗口、指定思考时间与目标比例，随时触发自动排班并追踪进度。</p>
+      <form id="auto-form">
+        <div class="input-group">
+          <label>团队 ID
+            <input type="number" name="team_id" min="1" required placeholder="例如 1" />
+          </label>
+          <label>日期范围
+            <div style="display:flex; gap:10px;">
+              <input type="date" name="start_date" required />
+              <input type="date" name="end_date" required />
+            </div>
+          </label>
+          <label>思考时间 (分钟)
+            <input type="number" name="think_minutes" min="1" max="120" value="5" />
+          </label>
+          <label>最少在岗人数
+            <input type="number" name="min_on_duty" min="1" value="3" />
+          </label>
+          <label>白班 : 中1 比例
+            <div style="display:flex; gap:10px; align-items:center;">
+              <input type="number" name="ratio_white" min="0" max="100" value="70" />
+              <span style="color:var(--muted);">:</span>
+              <input type="number" name="ratio_mid1" min="0" max="100" value="30" />
+            </div>
+          </label>
+          <label>历史窗口 (天)
+            <div style="display:flex; gap:10px;">
+              <input type="number" name="history_min" min="1" value="30" />
+              <input type="number" name="history_max" min="1" value="90" />
+            </div>
+          </label>
+          <label>节假日 (每行一个 YYYY-MM-DD)
+            <textarea name="holidays" placeholder="2025-10-01&#10;2025-10-02"></textarea>
+          </label>
+          <label>排班员工 (每行 ID 或 ID:备注)
+            <textarea name="employees" placeholder="12:张三&#10;18:李四"></textarea>
+          </label>
+        </div>
+        <div class="actions">
+          <button type="submit" id="start-btn">开始自动排班</button>
+          <button type="button" id="apply-btn" class="ghost" disabled>应用方案</button>
+          <button type="button" id="pause-btn" class="ghost" disabled>暂停</button>
+          <button type="button" id="resume-btn" class="ghost" disabled>继续</button>
+          <button type="button" id="cancel-btn" class="ghost" disabled>取消</button>
+        </div>
+      </form>
+      <div class="progress-wrap">
+        <div class="status-pill" id="job-status">待命</div>
+        <div class="progress-bar"><span id="progress-bar"></span></div>
+        <div class="steps" id="step-list"></div>
+        <div class="timeline" id="timeline"></div>
+      </div>
+    </aside>
+    <main class="auto-main">
+      <div class="score-panel">
+        <div class="score-card" id="score-total">
+          <div class="score-label">总评分</div>
+          <div class="score-value">--</div>
+          <div class="score-hint" id="score-total-hint"></div>
+        </div>
+        <div class="score-card" id="score-ratio">
+          <div class="score-label">比例匹配</div>
+          <div class="score-value">--</div>
+          <div class="score-hint" id="score-ratio-hint"></div>
+        </div>
+        <div class="score-card" id="score-fair">
+          <div class="score-label">均衡度</div>
+          <div class="score-value">--</div>
+          <div class="score-hint" id="score-fair-hint"></div>
+        </div>
+        <div class="score-card" id="score-recency">
+          <div class="score-label">轮转间隔</div>
+          <div class="score-value">--</div>
+          <div class="score-hint" id="score-recency-hint"></div>
+        </div>
+      </div>
+      <section class="preview">
+        <div class="violations" id="violations">
+          <strong>需要关注：</strong>
+          <ul></ul>
+        </div>
+        <div class="grid-scroll">
+          <table id="grid-table">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="auto-scheduler.js" type="module"></script>
+</body>
+</html>

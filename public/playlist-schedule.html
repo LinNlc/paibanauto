@@ -410,6 +410,26 @@
                 <span class="text-right">提示：仅已授权的账号可使用悬浮球进行自动排班与导入导出。</span>
               </div>
             </div>
+            <div id="duration-summary" class="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-4 space-y-3 hidden">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">任务时长统计</h3>
+                <span id="duration-config" class="text-sm text-slate-400"></span>
+              </div>
+              <div class="overflow-x-auto rounded-xl border border-slate-800/60">
+                <table class="min-w-full divide-y divide-slate-800/70 text-sm">
+                  <thead class="text-xs uppercase tracking-[0.2em] text-slate-400">
+                    <tr>
+                      <th class="px-4 py-2 text-left">姓名</th>
+                      <th class="px-4 py-2 text-right">白班（天）</th>
+                      <th class="px-4 py-2 text-right">中班（天）</th>
+                      <th class="px-4 py-2 text-right">总计（天）</th>
+                    </tr>
+                  </thead>
+                  <tbody id="duration-summary-body" class="divide-y divide-slate-800/60"></tbody>
+                </table>
+              </div>
+              <p id="duration-summary-empty" class="text-sm text-slate-400 hidden">暂无已分配的任务时长。</p>
+            </div>
             <div class="overflow-x-auto rounded-2xl border border-slate-800/70">
               <table class="playlist-table">
                 <thead>
@@ -529,6 +549,12 @@
     <input id="import-file" type="file" accept=".xlsx" class="hidden" />
 
     <script>
+      const PLAYLIST_DEFAULTS = Object.freeze({
+        white_duration: 1,
+        mid_duration: 1,
+        max_diff: 0.5,
+      });
+
       const state = {
         user: null,
         teams: [],
@@ -546,6 +572,7 @@
           importExport: false,
           autoFill: false,
         },
+        playlistSettings: { ...PLAYLIST_DEFAULTS },
       };
 
       const elements = {
@@ -561,6 +588,10 @@
         userName: document.getElementById('user-name'),
         tableBody: document.getElementById('schedule-body'),
         tableEmpty: document.getElementById('schedule-empty'),
+        durationSummary: document.getElementById('duration-summary'),
+        durationSummaryBody: document.getElementById('duration-summary-body'),
+        durationSummaryEmpty: document.getElementById('duration-summary-empty'),
+        durationConfig: document.getElementById('duration-config'),
         fab: document.getElementById('playlist-fab'),
         fabMenu: document.getElementById('playlist-fab-menu'),
         picker: document.getElementById('cell-picker'),
@@ -1034,11 +1065,104 @@
         return rounded;
       }
 
-      function getEligibleEmployeesForDay(day) {
-        const allowedSet = new Set(state.selectedEmpIds.map((id) => Number(id)));
+      function normalizePlaylistSettings(raw) {
+        if (!raw || typeof raw !== 'object') {
+          return { ...PLAYLIST_DEFAULTS };
+        }
+        const white = clampFraction(raw.white_duration ?? PLAYLIST_DEFAULTS.white_duration);
+        const mid = clampFraction(raw.mid_duration ?? PLAYLIST_DEFAULTS.mid_duration);
+        const maxDiff = clampFraction(raw.max_diff ?? PLAYLIST_DEFAULTS.max_diff);
+        return {
+          white_duration: white,
+          mid_duration: mid,
+          max_diff: maxDiff,
+        };
+      }
+
+      function roundDuration(value) {
+        const num = Number(value || 0);
+        if (!Number.isFinite(num)) {
+          return 0;
+        }
+        return Math.round(num * 100) / 100;
+      }
+
+      function formatDuration(value) {
+        const num = roundDuration(value);
+        if (Number.isInteger(num)) {
+          return `${num} 天`;
+        }
+        return `${num.toFixed(2)} 天`;
+      }
+
+      function formatFractionInput(value) {
+        const num = roundDuration(value);
+        if (Number.isInteger(num)) {
+          return String(num);
+        }
+        return num.toFixed(2);
+      }
+
+      function getPickerEmployeeSets(day) {
         const roster = Array.isArray(state.onDuty[day]) ? state.onDuty[day] : [];
         const rosterSet = new Set(roster.map((id) => Number(id)));
-        return state.employees.filter((emp) => allowedSet.has(Number(emp.id)) && rosterSet.has(Number(emp.id)));
+        const hasRoster = rosterSet.size > 0;
+        const selectedSet = new Set(state.selectedEmpIds.map((id) => Number(id)));
+        const allowAll = selectedSet.size === 0;
+        const primary = [];
+        const fallback = [];
+
+        state.employees.forEach((emp) => {
+          const empId = Number(emp.id);
+          if (!Number.isFinite(empId) || empId <= 0) {
+            return;
+          }
+          if (!allowAll && !selectedSet.has(empId)) {
+            return;
+          }
+          if (!hasRoster || rosterSet.has(empId)) {
+            primary.push(emp);
+          } else {
+            fallback.push(emp);
+          }
+        });
+
+        return { primary, fallback };
+      }
+
+      function getEligibleEmployeesForDay(day) {
+        const { primary, fallback } = getPickerEmployeeSets(day);
+        return primary.length ? primary : fallback;
+      }
+
+      function normalizeAutoWarnings(raw) {
+        if (!raw) {
+          return [];
+        }
+        if (Array.isArray(raw)) {
+          return raw.map((item) => String(item)).filter((text) => text.trim() !== '');
+        }
+        if (typeof raw !== 'object') {
+          return [];
+        }
+        const messages = [];
+        if (Array.isArray(raw.missing_days)) {
+          raw.missing_days.forEach((day) => {
+            const text = String(day || '').trim();
+            if (text) {
+              messages.push(`${text}（无在岗人员）`);
+            }
+          });
+        }
+        if (Array.isArray(raw.empty_shifts)) {
+          raw.empty_shifts.forEach((shift) => {
+            const text = String(shift || '').trim();
+            if (text) {
+              messages.push(`${text}（未分配）`);
+            }
+          });
+        }
+        return messages;
       }
 
       function normalizeViewList(list) {
@@ -1184,6 +1308,132 @@
         });
       }
 
+      function renderDurationSummary() {
+        if (!elements.durationSummary) {
+          return;
+        }
+        const settings = state.playlistSettings || { ...PLAYLIST_DEFAULTS };
+        const whiteUnit = roundDuration(settings.white_duration);
+        const midUnit = roundDuration(settings.mid_duration);
+
+        if (elements.durationConfig) {
+          elements.durationConfig.textContent = `白班耗时：${formatDuration(whiteUnit)} / 中班耗时：${formatDuration(midUnit)}`;
+        }
+
+        if (!state.days.length) {
+          elements.durationSummary.classList.add('hidden');
+          if (elements.durationSummaryBody) {
+            elements.durationSummaryBody.innerHTML = '';
+          }
+          if (elements.durationSummaryEmpty) {
+            elements.durationSummaryEmpty.classList.add('hidden');
+          }
+          return;
+        }
+
+        elements.durationSummary.classList.remove('hidden');
+        if (!elements.durationSummaryBody) {
+          return;
+        }
+
+        const employeesById = new Map();
+        state.employees.forEach((emp) => {
+          const id = Number(emp.id);
+          if (Number.isFinite(id) && id > 0) {
+            employeesById.set(id, emp);
+          }
+        });
+
+        const statsMap = new Map();
+        const whiteIncrement = roundDuration(whiteUnit);
+        const midIncrement = roundDuration(midUnit);
+
+        Object.entries(state.cells || {}).forEach(([, shifts]) => {
+          if (!shifts || typeof shifts !== 'object') {
+            return;
+          }
+          ['white', 'mid'].forEach((shiftKey) => {
+            const cell = shifts[shiftKey];
+            if (!cell || Number(cell.emp_id) <= 0) {
+              return;
+            }
+            const empId = Number(cell.emp_id);
+            if (!Number.isFinite(empId) || empId <= 0) {
+              return;
+            }
+            if (!statsMap.has(empId)) {
+              const meta = employeesById.get(empId) || { id: empId };
+              statsMap.set(empId, {
+                id: empId,
+                label: employeeLabel(meta),
+                white: 0,
+                mid: 0,
+              });
+            }
+            const stat = statsMap.get(empId);
+            if (shiftKey === 'white') {
+              stat.white += whiteIncrement;
+            } else if (shiftKey === 'mid') {
+              stat.mid += midIncrement;
+            }
+          });
+        });
+
+        const stats = Array.from(statsMap.values()).map((item) => {
+          const white = roundDuration(item.white);
+          const mid = roundDuration(item.mid);
+          return {
+            id: item.id,
+            label: item.label || `成员 #${item.id}`,
+            white,
+            mid,
+            total: roundDuration(white + mid),
+          };
+        });
+
+        stats.sort((a, b) => {
+          return String(a.label || '').localeCompare(String(b.label || ''), 'zh-Hans-CN');
+        });
+
+        if (!stats.length) {
+          elements.durationSummaryBody.innerHTML = '';
+          if (elements.durationSummaryEmpty) {
+            elements.durationSummaryEmpty.classList.remove('hidden');
+          }
+          return;
+        }
+
+        if (elements.durationSummaryEmpty) {
+          elements.durationSummaryEmpty.classList.add('hidden');
+        }
+
+        const totalWhite = roundDuration(stats.reduce((sum, row) => sum + row.white, 0));
+        const totalMid = roundDuration(stats.reduce((sum, row) => sum + row.mid, 0));
+        const totalAll = roundDuration(totalWhite + totalMid);
+
+        const rows = stats
+          .map((row) => `
+            <tr class="hover:bg-slate-800/40 transition">
+              <td class="px-4 py-2">${row.label}</td>
+              <td class="px-4 py-2 text-right">${formatDuration(row.white)}</td>
+              <td class="px-4 py-2 text-right">${formatDuration(row.mid)}</td>
+              <td class="px-4 py-2 text-right font-semibold text-slate-100">${formatDuration(row.total)}</td>
+            </tr>
+          `)
+          .join('');
+
+        const totalRow = `
+          <tr class="bg-slate-900/50 font-semibold">
+            <td class="px-4 py-2">合计</td>
+            <td class="px-4 py-2 text-right">${formatDuration(totalWhite)}</td>
+            <td class="px-4 py-2 text-right">${formatDuration(totalMid)}</td>
+            <td class="px-4 py-2 text-right text-slate-100">${formatDuration(totalAll)}</td>
+          </tr>
+        `;
+
+        elements.durationSummaryBody.innerHTML = rows + totalRow;
+      }
+
       function renderTable() {
         if (!elements.tableBody) return;
         ensureCellsStructure();
@@ -1191,6 +1441,7 @@
         if (!state.days.length) {
           elements.tableBody.innerHTML = '';
           elements.tableEmpty.classList.remove('hidden');
+          renderDurationSummary();
           return;
         }
         elements.tableEmpty.classList.add('hidden');
@@ -1212,6 +1463,7 @@
           `);
         });
         elements.tableBody.innerHTML = rows.join('');
+        renderDurationSummary();
       }
 
       function renderCellButton(day, shift, cell) {
@@ -1244,9 +1496,12 @@
         emptyOption.value = '';
         emptyOption.textContent = '未分配';
         elements.pickerSelect.appendChild(emptyOption);
-        const eligible = getEligibleEmployeesForDay(day);
+        const { primary, fallback } = getPickerEmployeeSets(day);
+        const eligible = primary;
         const eligibleIds = new Set(eligible.map((emp) => Number(emp.id)));
-        if (current && current.emp_id && !eligibleIds.has(Number(current.emp_id))) {
+        const fallbackIds = new Set(fallback.map((emp) => Number(emp.id)));
+        const combinedIds = new Set([...eligibleIds, ...fallbackIds]);
+        if (current && current.emp_id && !combinedIds.has(Number(current.emp_id))) {
           const fallbackOption = document.createElement('option');
           fallbackOption.value = String(current.emp_id);
           fallbackOption.textContent = `${employeeLabel({ id: current.emp_id, emp_display: current.emp_display, emp_name: current.emp_name })}（不在名单）`;
@@ -1268,9 +1523,26 @@
         } else {
           const placeholder = document.createElement('option');
           placeholder.value = '__noeligible';
-          placeholder.textContent = '暂无符合条件的人员';
+          placeholder.textContent = '当日排班日历无可分配人员';
           placeholder.disabled = true;
           elements.pickerSelect.appendChild(placeholder);
+        }
+        if (fallback.length) {
+          const separator = document.createElement('option');
+          separator.value = '__divider';
+          separator.textContent = '──────────';
+          separator.disabled = true;
+          elements.pickerSelect.appendChild(separator);
+          fallback.forEach((emp) => {
+            const option = document.createElement('option');
+            option.value = String(emp.id);
+            option.textContent = `${employeeLabel(emp)}（未在排班日历上班）`;
+            option.disabled = true;
+            if (current && Number(current.emp_id) === Number(emp.id)) {
+              option.selected = true;
+            }
+            elements.pickerSelect.appendChild(option);
+          });
         }
       }
 
@@ -1399,6 +1671,7 @@
           renderRangeInfo();
           renderTeamSelect();
           updateFloatingBall();
+          applyPlaylistSettingsToAutoForm();
           elements.shell.classList.remove('hidden');
           elements.denied.classList.add('hidden');
           return;
@@ -1415,6 +1688,7 @@
           state.onDuty = normalizeOnDutyMap(data.on_duty || {});
           state.canEdit = Boolean(data.can_edit);
           state.features = data.features || state.features;
+          state.playlistSettings = normalizePlaylistSettings(data.playlist_settings || state.playlistSettings);
           if (data.user) {
             state.user = data.user;
             elements.userName.textContent = data.user.display_name || data.user.username || '';
@@ -1432,6 +1706,7 @@
           renderTable();
           renderRosterSummary();
           renderAutoEmployeeList();
+          applyPlaylistSettingsToAutoForm();
           updateFloatingBall();
           elements.shell.classList.remove('hidden');
           elements.denied.classList.add('hidden');
@@ -1488,11 +1763,22 @@
           .join('');
       }
 
+      function applyPlaylistSettingsToAutoForm() {
+        if (!elements.autoWhite || !elements.autoMid || !elements.autoMax) {
+          return;
+        }
+        const settings = state.playlistSettings || PLAYLIST_DEFAULTS;
+        elements.autoWhite.value = formatFractionInput(settings.white_duration);
+        elements.autoMid.value = formatFractionInput(settings.mid_duration);
+        elements.autoMax.value = formatFractionInput(settings.max_diff);
+      }
+
       function openAutoModal() {
         if (!elements.autoModal) return;
         renderAutoEmployeeList();
         elements.autoStart.value = state.start || '';
         elements.autoEnd.value = state.end || '';
+        applyPlaylistSettingsToAutoForm();
         elements.autoModal.classList.add('show');
       }
 
@@ -1538,12 +1824,19 @@
             state.start = start;
             state.end = end;
             state.onDuty = normalizeOnDutyMap(result.on_duty || state.onDuty);
+            state.playlistSettings = normalizePlaylistSettings(result.playlist_settings || state.playlistSettings);
             state.days = generateDays(state.start, state.end);
             elements.startInput.value = state.start;
             elements.endInput.value = state.end;
             renderRangeInfo();
             renderTable();
-            App.toast('自动排班完成', { type: 'success' });
+            const warningMessages = normalizeAutoWarnings(result.warnings);
+            if (warningMessages.length) {
+              App.toast(`自动排班完成，但以下班次仍为空：${warningMessages.join('、')}`, { type: 'warning' });
+            } else {
+              App.toast('自动排班完成', { type: 'success' });
+            }
+            applyPlaylistSettingsToAutoForm();
             updateFloatingBall();
           }
         } catch (error) {
@@ -1592,6 +1885,7 @@
             state.start = start;
             state.end = end;
             state.onDuty = normalizeOnDutyMap(data.on_duty || state.onDuty);
+            state.playlistSettings = normalizePlaylistSettings(data.playlist_settings || state.playlistSettings);
             state.days = generateDays(state.start, state.end);
             elements.startInput.value = state.start;
             elements.endInput.value = state.end;
@@ -1599,6 +1893,7 @@
             renderTable();
             App.toast('导入完成', { type: 'success' });
             closeImportModal();
+            applyPlaylistSettingsToAutoForm();
             updateFloatingBall();
           }
           if (elements.ioStatus) {

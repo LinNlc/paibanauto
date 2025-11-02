@@ -45,12 +45,19 @@ function ensure_import_export_permission(array $permissions): void
     }
 }
 
+function make_date_cell(string $date): array
+{
+    return [
+        'type' => 'date',
+        'value' => $date,
+    ];
+}
+
 function deliver_template_workbook(): void
 {
     $rows = [
-        ['日期', '员工ID', '姓名', '班次'],
-        ['2024-01-01', '1001', '张三', '白'],
-        ['2024-01-01', '1002', '李四', '中1'],
+        ['日期', '示例：张三', '示例：李四'],
+        [make_date_cell('2025-11-01'), '白', '中1'],
     ];
 
     $content = build_workbook($rows);
@@ -108,7 +115,7 @@ function handle_import(PDO $pdo, array $user, array $permissions): void
     }
 
     $header = array_map('trim', $rows[0]);
-    if ($header[0] !== '日期' || $header[1] !== '员工ID' || $header[3] !== '班次') {
+    if (($header[0] ?? '') !== '日期') {
         json_err('模板格式不正确，请使用系统提供的模板', 422);
     }
 
@@ -116,9 +123,58 @@ function handle_import(PDO $pdo, array $user, array $permissions): void
     if ($employees === []) {
         json_err('该团队暂无员工数据', 404);
     }
-    $employeeMap = [];
+    $normalizeName = static function (string $value): string {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        if (function_exists('mb_strtolower')) {
+            return mb_strtolower($trimmed, 'UTF-8');
+        }
+
+        return strtolower($trimmed);
+    };
+
+    $nameIndex = [];
     foreach ($employees as $employee) {
-        $employeeMap[$employee['id']] = $employee;
+        $candidates = [];
+        if (isset($employee['display_name']) && trim((string) $employee['display_name']) !== '') {
+            $candidates[] = trim((string) $employee['display_name']);
+        }
+        if (isset($employee['name']) && trim((string) $employee['name']) !== '') {
+            $candidates[] = trim((string) $employee['name']);
+        }
+        foreach ($candidates as $candidate) {
+            $key = $normalizeName($candidate);
+            if ($key !== '' && !isset($nameIndex[$key])) {
+                $nameIndex[$key] = (int) $employee['id'];
+            }
+        }
+    }
+
+    $columnMap = [];
+    $usedEmployees = [];
+    $headerCount = count($header);
+    for ($col = 1; $col < $headerCount; $col++) {
+        $rawName = trim((string) ($header[$col] ?? ''));
+        if ($rawName === '') {
+            continue;
+        }
+        $key = $normalizeName($rawName);
+        if ($key === '' || !isset($nameIndex[$key])) {
+            json_err('无法匹配人员列：' . $rawName, 422);
+        }
+        $empId = $nameIndex[$key];
+        if (isset($usedEmployees[$empId])) {
+            json_err('导入文件中存在重复的人员列：' . $rawName, 422);
+        }
+        $columnMap[$col] = $empId;
+        $usedEmployees[$empId] = true;
+    }
+
+    if ($columnMap === []) {
+        json_err('未识别到任何人员列', 422);
     }
 
     $updates = [];
@@ -131,20 +187,18 @@ function handle_import(PDO $pdo, array $user, array $permissions): void
         if ($date === null) {
             continue;
         }
-        $empId = isset($row[1]) ? (int) $row[1] : 0;
-        if ($empId <= 0 || !isset($employeeMap[$empId])) {
-            continue;
+        foreach ($columnMap as $colIndex => $empId) {
+            $valueRaw = $row[$colIndex] ?? '';
+            $value = normalize_shift_value($valueRaw);
+            if ($value === null) {
+                continue;
+            }
+            $updates[] = [
+                'day' => $date,
+                'emp_id' => $empId,
+                'value' => $value,
+            ];
         }
-        $valueRaw = $row[3] ?? '';
-        $value = normalize_shift_value($valueRaw);
-        if ($value === null) {
-            continue;
-        }
-        $updates[] = [
-            'day' => $date,
-            'emp_id' => $empId,
-            'value' => $value,
-        ];
     }
 
     if ($updates === []) {
@@ -231,17 +285,31 @@ function fetch_schedule_cells_for_range(PDO $pdo, int $teamId, string $start, st
 
 function build_export_rows(array $employees, array $cells, string $start, string $end): array
 {
-    $rows = [['日期', '员工ID', '姓名', '班次']];
+    $headers = ['日期'];
+    $orderedEmployees = [];
+    foreach ($employees as $employee) {
+        $label = (string) ($employee['display_name'] ?? '');
+        if ($label === '') {
+            $label = (string) ($employee['name'] ?? '');
+        }
+        if ($label === '') {
+            $label = '员工 #' . $employee['id'];
+        }
+        $headers[] = $label;
+        $orderedEmployees[] = $employee;
+    }
+
+    $rows = [$headers];
     $cursor = new DateTimeImmutable($start);
     $endDate = new DateTimeImmutable($end);
 
     while ($cursor <= $endDate) {
         $day = $cursor->format('Y-m-d');
-        foreach ($employees as $employee) {
-            $value = $cells[$day][$employee['id']] ?? '';
-            $name = $employee['display_name'] !== '' ? $employee['display_name'] : $employee['name'];
-            $rows[] = [$day, $employee['id'], $name, $value];
+        $row = [make_date_cell($day)];
+        foreach ($orderedEmployees as $employee) {
+            $row[] = $cells[$day][$employee['id']] ?? '';
         }
+        $rows[] = $row;
         $cursor = $cursor->modify('+1 day');
     }
 
@@ -250,7 +318,11 @@ function build_export_rows(array $employees, array $cells, string $start, string
 
 function build_workbook(array $rows): string
 {
-    $sheetXml = generate_sheet_xml($rows);
+    $sharedStrings = [];
+    $sharedIndex = [];
+    $sheetXml = generate_sheet_xml($rows, $sharedIndex, $sharedStrings);
+    $sharedXml = generate_shared_strings_xml($sharedStrings);
+
     $tmp = tempnam(sys_get_temp_dir(), 'xlsx');
     if ($tmp === false) {
         json_err('无法创建临时文件', 500);
@@ -261,11 +333,13 @@ function build_workbook(array $rows): string
         json_err('无法生成Excel文件', 500);
     }
 
-    $zip->addFromString('[Content_Types].xml', get_content_types_xml());
+    $zip->addFromString('[Content_Types].xml', get_content_types_xml(true));
     $zip->addFromString('_rels/.rels', get_root_rels_xml());
-    $zip->addFromString('xl/_rels/workbook.xml.rels', get_workbook_rels_xml());
+    $zip->addFromString('xl/_rels/workbook.xml.rels', get_workbook_rels_xml(true));
     $zip->addFromString('xl/workbook.xml', get_workbook_xml());
+    $zip->addFromString('xl/styles.xml', get_styles_xml());
     $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
+    $zip->addFromString('xl/sharedStrings.xml', $sharedXml);
     $zip->close();
 
     $content = file_get_contents($tmp);
@@ -287,7 +361,7 @@ function output_workbook(string $filename, string $content): void
     exit;
 }
 
-function generate_sheet_xml(array $rows): string
+function generate_sheet_xml(array $rows, array &$sharedIndex, array &$sharedStrings): string
 {
     $xml = [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -299,14 +373,25 @@ function generate_sheet_xml(array $rows): string
         $excelRow = $rowIndex + 1;
         $xml[] = '<row r="' . $excelRow . '">';
         foreach ($row as $colIndex => $cell) {
-            $columnLetter = chr(ord('A') + $colIndex);
+            $columnLetter = column_index_to_name($colIndex + 1);
             $ref = $columnLetter . $excelRow;
-            if ($colIndex === 1 && $rowIndex > 0 && $cell !== '') {
-                $xml[] = '<c r="' . $ref . '"><v>' . (int) $cell . '</v></c>';
-            } else {
-                $escaped = htmlspecialchars((string) $cell, ENT_QUOTES | ENT_XML1, 'UTF-8');
-                $xml[] = '<c r="' . $ref . '" t="inlineStr"><is><t>' . $escaped . '</t></is></c>';
+
+            if (is_array($cell) && ($cell['type'] ?? '') === 'date') {
+                $serial = date_to_excel_serial((string) ($cell['value'] ?? ''));
+                if ($serial !== null) {
+                    $xml[] = '<c r="' . $ref . '" s="1"><v>' . $serial . '</v></c>';
+                    continue;
+                }
             }
+
+            $value = (string) $cell;
+            if ($value === '') {
+                $xml[] = '<c r="' . $ref . '"/>';
+                continue;
+            }
+
+            $index = get_shared_string_index($value, $sharedIndex, $sharedStrings);
+            $xml[] = '<c r="' . $ref . '" t="s"><v>' . $index . '</v></c>';
         }
         $xml[] = '</row>';
     }
@@ -317,14 +402,49 @@ function generate_sheet_xml(array $rows): string
     return implode('', $xml);
 }
 
-function get_content_types_xml(): string
+function get_shared_string_index(string $value, array &$sharedIndex, array &$sharedStrings): int
+{
+    if (isset($sharedIndex[$value])) {
+        return $sharedIndex[$value];
+    }
+
+    $index = count($sharedStrings);
+    $sharedIndex[$value] = $index;
+    $sharedStrings[] = $value;
+
+    return $index;
+}
+
+function generate_shared_strings_xml(array $strings): string
+{
+    $count = count($strings);
+    $xml = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="' . $count . '" uniqueCount="' . $count . '">',
+    ];
+
+    foreach ($strings as $value) {
+        $escaped = htmlspecialchars($value, ENT_QUOTES | ENT_XML1, 'UTF-8');
+        $needsPreserve = $value !== '' && trim($value) !== $value;
+        $attr = $needsPreserve ? ' xml:space="preserve"' : '';
+        $xml[] = '<si><t' . $attr . '>' . $escaped . '</t></si>';
+    }
+
+    $xml[] = '</sst>';
+
+    return implode('', $xml);
+}
+
+function get_content_types_xml(bool $includeSharedStrings): string
 {
     return '<?xml version="1.0" encoding="UTF-8"?>'
         . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
         . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
         . '<Default Extension="xml" ContentType="application/xml"/>'
         . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        . '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
         . '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        . ($includeSharedStrings ? '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>' : '')
         . '</Types>';
 }
 
@@ -336,11 +456,20 @@ function get_root_rels_xml(): string
         . '</Relationships>';
 }
 
-function get_workbook_rels_xml(): string
+function get_workbook_rels_xml(bool $includeSharedStrings): string
 {
+    $relationships = [
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>',
+        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>',
+    ];
+
+    if ($includeSharedStrings) {
+        $relationships[] = '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>';
+    }
+
     return '<?xml version="1.0" encoding="UTF-8"?>'
         . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        . implode('', $relationships)
         . '</Relationships>';
 }
 
@@ -352,6 +481,23 @@ function get_workbook_xml(): string
         . '</workbook>';
 }
 
+function get_styles_xml(): string
+{
+    return '<?xml version="1.0" encoding="UTF-8"?>'
+        . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        . '<numFmts count="1"><numFmt numFmtId="165" formatCode="yyyy/m/d"/></numFmts>'
+        . '<fonts count="1"><font><sz val="11"/><color theme="1"/><name val="Calibri"/><family val="2"/></font></fonts>'
+        . '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>'
+        . '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+        . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+        . '<cellXfs count="2">'
+        . '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+        . '<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
+        . '</cellXfs>'
+        . '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+        . '</styleSheet>';
+}
+
 function parse_workbook_rows(string $path): array
 {
     $zip = new ZipArchive();
@@ -360,11 +506,16 @@ function parse_workbook_rows(string $path): array
     }
 
     $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+    $stylesXml = $zip->getFromName('xl/styles.xml');
+    $sharedStringsXml = $zip->getFromName('xl/sharedStrings.xml');
     $zip->close();
 
     if ($sheetXml === false) {
         json_err('未找到工作表数据', 422);
     }
+
+    $dateStyleIndexes = parse_date_style_indexes($stylesXml);
+    $sharedStrings = parse_shared_strings($sharedStringsXml);
 
     $rows = [];
     $doc = new DOMDocument();
@@ -374,18 +525,202 @@ function parse_workbook_rows(string $path): array
         $cells = [];
         foreach ($rowNode->getElementsByTagName('c') as $cellNode) {
             $type = $cellNode->getAttribute('t');
+            $ref = $cellNode->getAttribute('r');
+            $styleAttr = $cellNode->getAttribute('s');
+            $styleIndex = $styleAttr !== '' ? (int) $styleAttr : null;
+            $colIndex = column_name_to_index($ref);
+            if ($colIndex <= 0) {
+                $colIndex = count($cells) + 1;
+            }
+            while (count($cells) < $colIndex - 1) {
+                $cells[] = '';
+            }
             if ($type === 'inlineStr') {
                 $textNode = $cellNode->getElementsByTagName('t')->item(0);
-                $cells[] = $textNode ? $textNode->textContent : '';
+                $cells[$colIndex - 1] = $textNode ? $textNode->textContent : '';
+            } elseif ($type === 's') {
+                $valueNode = $cellNode->getElementsByTagName('v')->item(0);
+                $index = $valueNode ? (int) $valueNode->textContent : null;
+                $cells[$colIndex - 1] = $index !== null && isset($sharedStrings[$index]) ? $sharedStrings[$index] : '';
             } else {
                 $valueNode = $cellNode->getElementsByTagName('v')->item(0);
-                $cells[] = $valueNode ? $valueNode->textContent : '';
+                $raw = $valueNode ? $valueNode->textContent : '';
+                if ($raw !== '' && $styleIndex !== null && isset($dateStyleIndexes[$styleIndex])) {
+                    $cells[$colIndex - 1] = excel_serial_to_date($raw) ?? '';
+                } else {
+                    $cells[$colIndex - 1] = $raw;
+                }
             }
         }
         $rows[] = $cells;
     }
 
     return $rows;
+}
+
+function column_index_to_name(int $index): string
+{
+    $name = '';
+    while ($index > 0) {
+        $index--;
+        $name = chr(65 + ($index % 26)) . $name;
+        $index = intdiv($index, 26);
+    }
+
+    return $name;
+}
+
+function column_name_to_index(string $ref): int
+{
+    if ($ref === '') {
+        return 0;
+    }
+
+    if (preg_match('/^([A-Z]+)/i', $ref, $matches)) {
+        $letters = strtoupper($matches[1]);
+        $index = 0;
+        $length = strlen($letters);
+        for ($i = 0; $i < $length; $i++) {
+            $index = $index * 26 + (ord($letters[$i]) - 64);
+        }
+
+        return $index;
+    }
+
+    return 0;
+}
+
+function parse_shared_strings($sharedStringsXml): array
+{
+    if ($sharedStringsXml === false || $sharedStringsXml === null) {
+        return [];
+    }
+
+    $doc = new DOMDocument();
+    $doc->loadXML($sharedStringsXml);
+
+    $strings = [];
+    foreach ($doc->getElementsByTagName('si') as $siIndex => $siNode) {
+        $text = '';
+        foreach ($siNode->getElementsByTagName('t') as $textNode) {
+            $text .= $textNode->textContent;
+        }
+        $strings[$siIndex] = $text;
+    }
+
+    return $strings;
+}
+
+function parse_date_style_indexes($stylesXml): array
+{
+    if ($stylesXml === false || $stylesXml === null) {
+        return [];
+    }
+
+    $doc = new DOMDocument();
+    $doc->loadXML($stylesXml);
+
+    $customFormats = [];
+    foreach ($doc->getElementsByTagName('numFmt') as $numFmt) {
+        $id = (int) $numFmt->getAttribute('numFmtId');
+        $code = (string) $numFmt->getAttribute('formatCode');
+        if ($id > 0 && $code !== '') {
+            $customFormats[$id] = $code;
+        }
+    }
+
+    $dateStyles = [];
+    $cellXfsNodes = $doc->getElementsByTagName('cellXfs');
+    if ($cellXfsNodes->length === 0) {
+        return $dateStyles;
+    }
+
+    $xfNodes = $cellXfsNodes->item(0)->getElementsByTagName('xf');
+    $index = 0;
+    foreach ($xfNodes as $xfNode) {
+        $numFmtId = (int) $xfNode->getAttribute('numFmtId');
+        $formatCode = $customFormats[$numFmtId] ?? null;
+        if (is_date_format($numFmtId, $formatCode)) {
+            $dateStyles[$index] = true;
+        }
+        $index++;
+    }
+
+    return $dateStyles;
+}
+
+function is_date_format(int $numFmtId, ?string $formatCode): bool
+{
+    $builtIn = [14, 15, 16, 17, 18, 19, 20, 21, 22, 27, 30, 36, 45, 46, 47, 50, 57, 58, 165];
+    if (in_array($numFmtId, $builtIn, true)) {
+        return true;
+    }
+
+    if ($formatCode === null) {
+        return false;
+    }
+
+    $normalized = strtolower($formatCode);
+    $normalized = preg_replace('/\[[^\]]*\]/', '', $normalized);
+
+    return strpos($normalized, 'y') !== false
+        && strpos($normalized, 'm') !== false
+        && strpos($normalized, 'd') !== false;
+}
+
+function date_to_excel_serial(string $date): ?string
+{
+    $normalized = normalize_day($date);
+    if ($normalized === null) {
+        return null;
+    }
+
+    $dateObj = DateTimeImmutable::createFromFormat('Y-m-d', $normalized);
+    if ($dateObj === false) {
+        return null;
+    }
+
+    $base = new DateTimeImmutable('1899-12-31');
+    $diff = $base->diff($dateObj);
+    if ($diff->invert === 1) {
+        return null;
+    }
+
+    $days = (int) $diff->format('%a');
+    if ($days >= 60) {
+        $days++;
+    }
+
+    return (string) $days;
+}
+
+function excel_serial_to_date($value): ?string
+{
+    if (!is_numeric($value)) {
+        return null;
+    }
+
+    $serial = (int) floor((float) $value + 0.00001);
+    if ($serial <= 0) {
+        return null;
+    }
+
+    if ($serial === 60) {
+        // Excel's fictitious 1900-02-29; map to 1900-02-28 to avoid invalid date
+        $serial = 59;
+    }
+
+    if ($serial > 60) {
+        $serial--;
+    }
+
+    $base = new DateTimeImmutable('1899-12-31');
+    $date = $base->modify('+' . $serial . ' days');
+    if ($date === false) {
+        return null;
+    }
+
+    return $date->format('Y-m-d');
 }
 
 function apply_schedule_value(PDO $pdo, array $user, int $teamId, int $employeeId, string $day, string $value): array
@@ -446,12 +781,26 @@ function normalize_day(string $value): ?string
         return null;
     }
 
-    $date = DateTimeImmutable::createFromFormat('Y-m-d', $trimmed);
-    if ($date === false) {
+    $normalized = str_replace(['年', '月', '日', '/', '.'], ['-', '-', '', '-', '-'], $trimmed);
+    $normalized = preg_replace('/\s+/', '', $normalized);
+    $normalized = preg_replace('/-+/', '-', $normalized);
+    $normalized = trim((string) $normalized, '-');
+
+    if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $normalized, $matches)) {
+        $year = (int) $matches[1];
+        $month = (int) $matches[2];
+        $day = (int) $matches[3];
+        if (checkdate($month, $day, $year)) {
+            return sprintf('%04d-%02d-%02d', $year, $month, $day);
+        }
+    }
+
+    $timestamp = strtotime($trimmed);
+    if ($timestamp === false) {
         return null;
     }
 
-    return $date->format('Y-m-d');
+    return gmdate('Y-m-d', $timestamp);
 }
 
 function find_schedule_cell(PDO $pdo, int $teamId, int $employeeId, string $day): ?array
