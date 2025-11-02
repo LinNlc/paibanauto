@@ -79,6 +79,7 @@ function handle_playlist_get(): void
             'user' => $user,
             'features' => playlist_feature_payload($permissions),
             'on_duty' => new stdClass(),
+            'playlist_settings' => playlist_default_settings(),
         ]);
     }
 
@@ -86,6 +87,7 @@ function handle_playlist_get(): void
 
     $employees = fetch_team_employees($pdo, $teamId);
     $cells = playlist_fetch_cells($pdo, $teamId, $startDate, $endDate);
+    $playlistSettings = playlist_load_settings($pdo, $teamId);
 
     $grid = [];
     foreach ($cells as $cell) {
@@ -115,6 +117,7 @@ function handle_playlist_get(): void
         'user' => $user,
         'features' => playlist_feature_payload($permissions),
         'on_duty' => playlist_fetch_on_duty($pdo, $teamId, $startDate, $endDate),
+        'playlist_settings' => $playlistSettings,
     ]);
 }
 
@@ -156,6 +159,11 @@ function handle_playlist_update_cell(array $payload): void
             json_err('员工不存在', 404);
         }
         $employeeName = $map[$employeeId]['label'];
+        $onDutyMap = playlist_fetch_on_duty($pdo, $teamId, $day, $day);
+        $onDutyList = $onDutyMap[$day] ?? [];
+        if (!in_array($employeeId, $onDutyList, true)) {
+            json_err('该员工当天未在排班日历上班，无法分配任务', 422);
+        }
     }
 
     $userId = (int) ($user['id'] ?? 0);
@@ -227,6 +235,17 @@ function handle_playlist_auto_fill(array $payload): void
         }
         $employees[] = $map[$id];
     }
+
+    $settingsPayload = [
+        'white_duration' => $whiteDuration,
+        'mid_duration' => $midDuration,
+        'max_diff' => $maxDiff,
+    ];
+    $normalizedSettings = normalize_playlist_settings($settingsPayload);
+    playlist_save_settings($pdo, $teamId, $normalizedSettings);
+    $whiteDuration = $normalizedSettings['white_duration'];
+    $midDuration = $normalizedSettings['mid_duration'];
+    $maxDiff = $normalizedSettings['max_diff'];
 
     $days = playlist_generate_days($startDate, $endDate);
 
@@ -319,6 +338,7 @@ function handle_playlist_auto_fill(array $payload): void
     json_ok([
         'cells' => $grid,
         'on_duty' => playlist_fetch_on_duty($pdo, $teamId, $startDate, $endDate),
+        'playlist_settings' => $normalizedSettings,
         'warnings' => [
             'missing_days' => array_values($missingDays),
             'empty_shifts' => array_values($emptyShiftWarnings),
@@ -466,6 +486,7 @@ function handle_playlist_import(): void
         'end' => $endDate,
         'cells' => $grid,
         'on_duty' => playlist_fetch_on_duty($pdo, $teamId, $startDate, $endDate),
+        'playlist_settings' => playlist_load_settings($pdo, $teamId),
     ]);
 }
 
@@ -677,25 +698,6 @@ function playlist_feature_payload(array $permissions): array
         'importExport' => permissions_has_feature($permissions, 'playlistImportExport'),
         'autoFill' => permissions_has_feature($permissions, 'playlistAutoFill'),
     ];
-}
-
-function playlist_normalize_fraction($value): float
-{
-    if (is_string($value) || is_numeric($value)) {
-        $number = (float) $value;
-        if (is_finite($number)) {
-            $rounded = round($number, 2);
-            if ($rounded < 0.0) {
-                return 0.0;
-            }
-            if ($rounded > 1.0) {
-                return 1.0;
-            }
-            return $rounded;
-        }
-    }
-
-    return 0.0;
 }
 
 function playlist_generate_days(string $startDate, string $endDate): array
