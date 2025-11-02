@@ -481,6 +481,89 @@ function playlist_shift_label(string $shift): string
     }
 }
 
+function playlist_normalize_fraction($value): float
+{
+    if (is_string($value) || is_numeric($value)) {
+        $number = (float) $value;
+        if (is_finite($number)) {
+            $rounded = round($number, 2);
+            if ($rounded < 0.0) {
+                return 0.0;
+            }
+            if ($rounded > 1.0) {
+                return 1.0;
+            }
+            return $rounded;
+        }
+    }
+
+    return 0.0;
+}
+
+function playlist_default_settings(): array
+{
+    return [
+        'white_duration' => 1.0,
+        'mid_duration' => 1.0,
+        'max_diff' => 0.5,
+    ];
+}
+
+function normalize_playlist_settings($value): array
+{
+    $settings = is_array($value) ? $value : [];
+    $defaults = playlist_default_settings();
+
+    $white = array_key_exists('white_duration', $settings) ? playlist_normalize_fraction($settings['white_duration']) : $defaults['white_duration'];
+    $mid = array_key_exists('mid_duration', $settings) ? playlist_normalize_fraction($settings['mid_duration']) : $defaults['mid_duration'];
+    $maxDiff = array_key_exists('max_diff', $settings) ? playlist_normalize_fraction($settings['max_diff']) : $defaults['max_diff'];
+
+    return [
+        'white_duration' => $white,
+        'mid_duration' => $mid,
+        'max_diff' => $maxDiff,
+    ];
+}
+
+function playlist_load_settings(PDO $pdo, int $teamId): array
+{
+    if ($teamId <= 0) {
+        return playlist_default_settings();
+    }
+
+    $stmt = $pdo->prepare('SELECT settings_json FROM teams WHERE id = :id LIMIT 1');
+    $stmt->execute([':id' => $teamId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return playlist_default_settings();
+    }
+
+    $settings = decode_team_settings($row['settings_json'] ?? '{}');
+    $playlist = $settings['playlist'] ?? [];
+
+    return normalize_playlist_settings($playlist);
+}
+
+function playlist_save_settings(PDO $pdo, int $teamId, array $playlistSettings): void
+{
+    if ($teamId <= 0) {
+        return;
+    }
+
+    $stmt = $pdo->prepare('SELECT settings_json FROM teams WHERE id = :id LIMIT 1');
+    $stmt->execute([':id' => $teamId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $settings = $row ? decode_team_settings($row['settings_json'] ?? '{}') : [];
+    $settings['playlist'] = normalize_playlist_settings($playlistSettings);
+
+    $update = $pdo->prepare('UPDATE teams SET settings_json = :settings WHERE id = :id');
+    $update->execute([
+        ':settings' => encode_json_field($settings),
+        ':id' => $teamId,
+    ]);
+}
+
 function playlist_fetch_cells(PDO $pdo, int $teamId, string $startDate, string $endDate): array
 {
     $stmt = $pdo->prepare('SELECT c.id, c.day, c.shift, c.emp_id, c.emp_name, c.version, c.updated_at, c.updated_by,
@@ -836,6 +919,8 @@ function normalize_team_settings($value): array
     $settings = is_array($value) ? $value : [];
     $assist = $settings['assist'] ?? [];
     $settings['assist'] = normalize_assist_settings($assist);
+    $playlist = $settings['playlist'] ?? [];
+    $settings['playlist'] = normalize_playlist_settings($playlist);
     return $settings;
 }
 

@@ -216,16 +216,17 @@
           <div class="bg-slate-900/60 border border-slate-800/60 rounded-3xl p-6 shadow-2xl space-y-4">
             <div>
               <h2 class="text-lg font-semibold text-slate-100">人员排班统计</h2>
-              <p class="text-sm text-slate-400">统计区间内各成员在播单白班与中班的排班次数。</p>
+              <p class="text-sm text-slate-400">统计区间内各成员在播单白班与中班的排班时长（天）。</p>
             </div>
+            <p id="playlist-summary" class="text-sm text-slate-300 hidden"></p>
             <div class="overflow-x-auto rounded-2xl border border-slate-800/70">
               <table class="min-w-full divide-y divide-slate-800/80">
                 <thead class="text-xs uppercase tracking-wider text-slate-400">
                   <tr>
                     <th class="px-4 py-3 text-left">姓名</th>
-                    <th class="px-4 py-3 text-right">白班</th>
-                    <th class="px-4 py-3 text-right">中班</th>
-                    <th class="px-4 py-3 text-right">总计</th>
+                    <th class="px-4 py-3 text-right">白班（天）</th>
+                    <th class="px-4 py-3 text-right">中班（天）</th>
+                    <th class="px-4 py-3 text-right">总计（天）</th>
                   </tr>
                 </thead>
                 <tbody id="playlist-person-body" class="divide-y divide-slate-800/60"></tbody>
@@ -237,7 +238,7 @@
           <div class="bg-slate-900/60 border border-slate-800/60 rounded-3xl p-6 shadow-2xl space-y-4">
             <div>
               <h2 class="text-lg font-semibold text-slate-100">每日排班分布</h2>
-              <p class="text-sm text-slate-400">查看每日白班与中班的排班情况。</p>
+              <p class="text-sm text-slate-400">查看每日白班与中班的排班时长分布（天）。</p>
             </div>
             <div class="overflow-x-auto rounded-2xl border border-slate-800/70">
               <table class="min-w-full divide-y divide-slate-800/80">
@@ -245,9 +246,9 @@
                   <tr>
                     <th class="px-4 py-3 text-left">日期</th>
                     <th class="px-4 py-3 text-left">星期</th>
-                    <th class="px-4 py-3 text-right">白班</th>
-                    <th class="px-4 py-3 text-right">中班</th>
-                    <th class="px-4 py-3 text-right">总计</th>
+                    <th class="px-4 py-3 text-right">白班（天）</th>
+                    <th class="px-4 py-3 text-right">中班（天）</th>
+                    <th class="px-4 py-3 text-right">总计（天）</th>
                   </tr>
                 </thead>
                 <tbody id="playlist-daily-body" class="divide-y divide-slate-800/60"></tbody>
@@ -260,6 +261,12 @@
     </div>
 
     <script>
+      const PLAYLIST_DEFAULTS = Object.freeze({
+        white_duration: 1,
+        mid_duration: 1,
+        max_diff: 0.5,
+      });
+
       const state = {
         user: null,
         teams: [],
@@ -281,6 +288,7 @@
         coverageKey: '',
         playlistKey: '',
         isLoading: false,
+        playlistSettings: { ...PLAYLIST_DEFAULTS },
       };
 
       const CURRENT_VIEW = 'stats';
@@ -363,6 +371,7 @@
       const playlistPersonBody = document.getElementById('playlist-person-body');
       const playlistPersonEmpty = document.getElementById('playlist-person-empty');
       const playlistDailyBody = document.getElementById('playlist-daily-body');
+      const playlistSummary = document.getElementById('playlist-summary');
       const playlistDailyEmpty = document.getElementById('playlist-daily-empty');
 
 
@@ -665,6 +674,7 @@
 
           state.playlistRecords = Array.isArray(data.records) ? data.records : [];
           state.playlistDaily = Array.isArray(data.daily) ? data.daily : [];
+          state.playlistSettings = normalizePlaylistSettings(data.playlist_settings || state.playlistSettings);
           state.playlistKey = key;
 
           updateFiltersFromState();
@@ -887,6 +897,70 @@
         drawChart(labels, totalSeries, whiteSeries, mid1Series, mid2Series, nightSeries);
       }
 
+      function clampPlaylistValue(value, fallback) {
+        const num = Number.parseFloat(value);
+        if (!Number.isFinite(num)) {
+          return fallback;
+        }
+        const rounded = Math.round(num * 100) / 100;
+        if (rounded < 0) {
+          return 0;
+        }
+        if (rounded > 1) {
+          return 1;
+        }
+        return rounded;
+      }
+
+      function normalizePlaylistSettings(raw) {
+        if (!raw || typeof raw !== 'object') {
+          return { ...PLAYLIST_DEFAULTS };
+        }
+        return {
+          white_duration: clampPlaylistValue(raw.white_duration, PLAYLIST_DEFAULTS.white_duration),
+          mid_duration: clampPlaylistValue(raw.mid_duration, PLAYLIST_DEFAULTS.mid_duration),
+          max_diff: clampPlaylistValue(raw.max_diff, PLAYLIST_DEFAULTS.max_diff),
+        };
+      }
+
+      function formatDays(value) {
+        const num = Number(value || 0);
+        if (!Number.isFinite(num)) {
+          return '0 天';
+        }
+        if (Number.isInteger(num)) {
+          return `${num} 天`;
+        }
+        return `${num.toFixed(2)} 天`;
+      }
+
+      function updatePlaylistSummary() {
+        if (!playlistSummary) {
+          return;
+        }
+        if (!state.hasPlaylistAccess) {
+          playlistSummary.classList.add('hidden');
+          playlistSummary.textContent = '';
+          return;
+        }
+        const settings = state.playlistSettings || PLAYLIST_DEFAULTS;
+        const whiteUnit = formatDays(settings.white_duration);
+        const midUnit = formatDays(settings.mid_duration);
+        if (!state.playlistRecords.length) {
+          playlistSummary.classList.remove('hidden');
+          playlistSummary.textContent = `暂无播单时长数据（白班单位：${whiteUnit}，中班单位：${midUnit}）。`;
+          return;
+        }
+        const totalWhite = state.playlistRecords.reduce((sum, record) => sum + Number(record.white || 0), 0);
+        const totalMid = state.playlistRecords.reduce((sum, record) => sum + Number(record.mid || 0), 0);
+        const total = totalWhite + totalMid;
+        const whiteLabel = formatDays(totalWhite);
+        const midLabel = formatDays(totalMid);
+        const totalLabel = formatDays(total);
+        playlistSummary.classList.remove('hidden');
+        playlistSummary.textContent = `播单时长合计（白班单位：${whiteUnit}，中班单位：${midUnit}）：白班 ${whiteLabel} / 中班 ${midLabel} / 总计 ${totalLabel}`;
+      }
+
       function renderPlaylist() {
         if (!playlistPersonBody || !playlistDailyBody) {
           return;
@@ -897,8 +971,14 @@
           playlistDailyBody.innerHTML = '';
           playlistPersonEmpty.classList.add('hidden');
           playlistDailyEmpty.classList.add('hidden');
+          if (playlistSummary) {
+            playlistSummary.classList.add('hidden');
+            playlistSummary.textContent = '';
+          }
           return;
         }
+
+        updatePlaylistSummary();
 
         playlistPersonBody.innerHTML = '';
         if (!state.playlistRecords.length) {
@@ -914,9 +994,9 @@
               return `
                 <tr class="hover:bg-slate-800/40 transition">
                   <td class="px-4 py-3">${name}</td>
-                  <td class="px-4 py-3 text-right">${white}</td>
-                  <td class="px-4 py-3 text-right">${mid}</td>
-                  <td class="px-4 py-3 text-right font-semibold text-slate-100">${total}</td>
+                  <td class="px-4 py-3 text-right">${formatDays(white)}</td>
+                  <td class="px-4 py-3 text-right">${formatDays(mid)}</td>
+                  <td class="px-4 py-3 text-right font-semibold text-slate-100">${formatDays(total)}</td>
                 </tr>
               `;
             })
@@ -940,9 +1020,9 @@
                 <tr class="hover:bg-slate-800/40 transition">
                   <td class="px-4 py-3">${day}</td>
                   <td class="px-4 py-3 text-slate-400">${weekday}</td>
-                  <td class="px-4 py-3 text-right">${white}</td>
-                  <td class="px-4 py-3 text-right">${mid}</td>
-                  <td class="px-4 py-3 text-right font-semibold text-slate-100">${total}</td>
+                  <td class="px-4 py-3 text-right">${formatDays(white)}</td>
+                  <td class="px-4 py-3 text-right">${formatDays(mid)}</td>
+                  <td class="px-4 py-3 text-right font-semibold text-slate-100">${formatDays(total)}</td>
                 </tr>
               `;
             })
