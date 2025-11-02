@@ -25,6 +25,8 @@ const gridTable = document.getElementById('grid-table');
 let currentJobId = null;
 let eventSource = null;
 let latestResult = null;
+const SNAPSHOT_STORAGE_PREFIX = 'auto:snapshot:';
+const SNAPSHOT_MAX_AGE = 2 * 60 * 60 * 1000;
 
 const PHASE_LABELS = {
   [AUTO_PHASE_INIT()]: '初始化',
@@ -52,6 +54,8 @@ const STEP_ORDER = [
 ];
 
 initSteps();
+prefillFromSnapshot();
+prefillFromQuery();
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -113,6 +117,265 @@ function initSteps() {
     el.textContent = PHASE_LABELS[phase] || phase;
     stepList.appendChild(el);
   });
+}
+
+function prefillFromSnapshot() {
+  const params = new URLSearchParams(window.location.search);
+  const snapshotId = params.get('snapshot');
+  purgeStaleSnapshots();
+  if (!snapshotId) {
+    return;
+  }
+  const storage = getSnapshotStorage();
+  if (!storage) {
+    return;
+  }
+  const storageKey = `${SNAPSHOT_STORAGE_PREFIX}${snapshotId}`;
+  let raw = null;
+  try {
+    raw = storage.getItem(storageKey);
+  } catch (err) {
+    raw = null;
+  }
+  if (!raw) {
+    return;
+  }
+  try {
+    storage.removeItem(storageKey);
+  } catch (err) {
+    console.warn('auto snapshot cleanup failed', err);
+  }
+  let payload = null;
+  try {
+    const parsed = JSON.parse(raw);
+    payload = parsed && typeof parsed === 'object' && parsed.payload ? parsed.payload : parsed;
+  } catch (err) {
+    console.warn('auto snapshot parse error', err);
+    return;
+  }
+  if (!payload || typeof payload !== 'object') {
+    return;
+  }
+  if (payload.teamId) {
+    setFieldValue('team_id', payload.teamId);
+  }
+  if (payload.startDate) {
+    setFieldValue('start_date', payload.startDate);
+  }
+  if (payload.endDate) {
+    setFieldValue('end_date', payload.endDate);
+  }
+  if (payload.minOnDuty) {
+    setFieldValue('min_on_duty', payload.minOnDuty);
+  }
+  if (payload.thinkMinutes) {
+    setFieldValue('think_minutes', payload.thinkMinutes);
+  }
+  if (payload.historyMin) {
+    setFieldValue('history_min', payload.historyMin);
+  }
+  if (payload.historyMax) {
+    setFieldValue('history_max', payload.historyMax);
+  }
+  if (Array.isArray(payload.holidays) && payload.holidays.length) {
+    setFieldValue('holidays', payload.holidays.join('\n'));
+  }
+  if (Array.isArray(payload.employees) && payload.employees.length) {
+    setEmployeesList(payload.employees);
+  }
+  if (payload.targetRatio && typeof payload.targetRatio === 'object') {
+    const white = payload.targetRatio['白'] ?? payload.targetRatio.white;
+    const mid = payload.targetRatio['中1'] ?? payload.targetRatio.mid1;
+    if (white != null) {
+      const value = formatRatioValue(white);
+      if (value != null) {
+        setFieldValue('ratio_white', value);
+      }
+    }
+    if (mid != null) {
+      const value = formatRatioValue(mid);
+      if (value != null) {
+        setFieldValue('ratio_mid1', value);
+      }
+    }
+  }
+}
+
+function prefillFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params || Array.from(params.keys()).length === 0) {
+    return;
+  }
+  const teamId = params.get('team_id') || params.get('team');
+  if (teamId) {
+    setFieldValue('team_id', teamId);
+  }
+  const start = params.get('start_date') || params.get('start');
+  if (start) {
+    setFieldValue('start_date', start);
+  }
+  const end = params.get('end_date') || params.get('end');
+  if (end) {
+    setFieldValue('end_date', end);
+  }
+  const think = params.get('think_minutes') || params.get('think');
+  if (think) {
+    setFieldValue('think_minutes', think);
+  }
+  const minOnDuty = params.get('min_on_duty') || params.get('min');
+  if (minOnDuty) {
+    setFieldValue('min_on_duty', minOnDuty);
+  }
+  const historyMin = params.get('history_min');
+  if (historyMin) {
+    setFieldValue('history_min', historyMin);
+  }
+  const historyMax = params.get('history_max');
+  if (historyMax) {
+    setFieldValue('history_max', historyMax);
+  }
+  const ratioWhite = params.get('ratio_white');
+  if (ratioWhite != null) {
+    const value = formatRatioValue(ratioWhite);
+    if (value != null) {
+      setFieldValue('ratio_white', value);
+    }
+  }
+  const ratioMid = params.get('ratio_mid1') || params.get('ratio_mid');
+  if (ratioMid != null) {
+    const value = formatRatioValue(ratioMid);
+    if (value != null) {
+      setFieldValue('ratio_mid1', value);
+    }
+  }
+  const holidays = params.getAll('holiday');
+  const holidayCsv = params.get('holidays');
+  const holidayList = [];
+  if (holidayCsv) {
+    holidayCsv
+      .split(/[;,]/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .forEach((item) => holidayList.push(item));
+  }
+  holidays
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .forEach((item) => holidayList.push(item));
+  if (holidayList.length) {
+    setFieldValue('holidays', holidayList.join('\n'));
+  }
+  const employeeParams = params.getAll('employee');
+  const employeesRaw = params.get('employees');
+  if (employeeParams.length || employeesRaw) {
+    const items = employeeParams.slice();
+    if (employeesRaw) {
+      employeesRaw
+        .split(/[\n;,]/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .forEach((item) => items.push(item));
+    }
+    if (items.length) {
+      setFieldValue('employees', items.join('\n'));
+    }
+  }
+}
+
+function purgeStaleSnapshots() {
+  const storage = getSnapshotStorage();
+  if (!storage) {
+    return;
+  }
+  const keys = [];
+  for (let i = 0; i < storage.length; i += 1) {
+    const key = storage.key(i);
+    if (key && key.startsWith(SNAPSHOT_STORAGE_PREFIX)) {
+      keys.push(key);
+    }
+  }
+  if (!keys.length) {
+    return;
+  }
+  const now = Date.now();
+  keys.forEach((key) => {
+    try {
+      const raw = storage.getItem(key);
+      if (!raw) {
+        storage.removeItem(key);
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      const created = Number(parsed && parsed.created_at);
+      if (!Number.isFinite(created) || now - created > SNAPSHOT_MAX_AGE) {
+        storage.removeItem(key);
+      }
+    } catch (err) {
+      try {
+        storage.removeItem(key);
+      } catch (removeErr) {
+        console.warn('auto snapshot purge failed', removeErr);
+      }
+    }
+  });
+}
+
+function getSnapshotStorage() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    return window.localStorage || null;
+  } catch (err) {
+    console.warn('auto snapshot storage unavailable', err);
+    return null;
+  }
+}
+
+function setFieldValue(name, value) {
+  if (!form) {
+    return;
+  }
+  const field = form.querySelector(`[name="${name}"]`);
+  if (!field) {
+    return;
+  }
+  field.value = value;
+}
+
+function setEmployeesList(list) {
+  if (!Array.isArray(list) || !list.length) {
+    return;
+  }
+  const lines = list
+    .map((item) => {
+      if (!item || typeof item !== 'object') {
+        return null;
+      }
+      const id = Number(item.id ?? item.emp_id);
+      if (!Number.isFinite(id) || id <= 0) {
+        return null;
+      }
+      const label = item.label || item.display_name || item.name || item.emp_name || '';
+      return label ? `${id}:${label}` : String(id);
+    })
+    .filter(Boolean)
+    .join('\n');
+  if (lines) {
+    setFieldValue('employees', lines);
+  }
+}
+
+function formatRatioValue(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    return null;
+  }
+  if (Math.abs(num) <= 1) {
+    const pct = Math.round(num * 10000) / 100;
+    return String(pct);
+  }
+  return String(num);
 }
 
 function buildPayload(formData) {
