@@ -1524,22 +1524,10 @@
         const shifts = state.cells[day] || {};
         const current = shifts[shift] || null;
         elements.pickerSelect.innerHTML = '';
-        const emptyOption = document.createElement('option');
-        emptyOption.value = '';
-        emptyOption.textContent = '未分配';
-        elements.pickerSelect.appendChild(emptyOption);
-        const { primary, roster } = getPickerEmployeeSets(day, shift);
+        elements.pickerSelect.disabled = false;
+        elements.pickerConfirm.disabled = false;
+        const { primary } = getPickerEmployeeSets(day, shift);
         const eligible = primary;
-        const rosterIds = roster instanceof Set ? roster : new Set();
-        if (current && current.emp_id && !rosterIds.has(Number(current.emp_id))) {
-          const fallbackOption = document.createElement('option');
-          fallbackOption.value = String(current.emp_id);
-          fallbackOption.textContent = `${employeeLabel({ id: current.emp_id, emp_display: current.emp_display, emp_name: current.emp_name })}（不在名单）`;
-          fallbackOption.selected = true;
-          fallbackOption.disabled = true;
-          elements.pickerSelect.appendChild(fallbackOption);
-          elements.pickerSelect.value = String(current.emp_id);
-        }
         if (eligible.length) {
           eligible.forEach((emp) => {
             const option = document.createElement('option');
@@ -1552,10 +1540,13 @@
           });
         } else {
           const placeholder = document.createElement('option');
-          placeholder.value = '__noeligible';
+          placeholder.value = '';
           placeholder.textContent = '当日该班次排班日历无可分配人员';
           placeholder.disabled = true;
+          placeholder.selected = true;
           elements.pickerSelect.appendChild(placeholder);
+          elements.pickerSelect.disabled = true;
+          elements.pickerConfirm.disabled = true;
         }
       }
 
@@ -1981,7 +1972,16 @@
         elements.pickerConfirm.addEventListener('click', () => {
           const day = elements.picker.dataset.day;
           const shift = elements.picker.dataset.shift;
-          const empId = Number(elements.pickerSelect.value || 0);
+          const rawValue = elements.pickerSelect.value;
+          if (!rawValue) {
+            App.toast('请选择在班成员', { type: 'error' });
+            return;
+          }
+          const empId = Number(rawValue);
+          if (!Number.isFinite(empId) || empId <= 0) {
+            App.toast('请选择在班成员', { type: 'error' });
+            return;
+          }
           closePicker();
           updateCell(day, shift, empId);
         });
