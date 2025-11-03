@@ -163,10 +163,17 @@ function handle_playlist_update_cell(array $payload): void
         $onDutyDay = $onDutyMap[$day] ?? [];
         $shiftRoster = [];
         if (is_array($onDutyDay)) {
-            if (isset($onDutyDay[$shift]) && is_array($onDutyDay[$shift])) {
-                $shiftRoster = $onDutyDay[$shift];
-            } elseif (isset($onDutyDay['all']) && is_array($onDutyDay['all'])) {
-                $shiftRoster = $onDutyDay['all'];
+            if (array_values($onDutyDay) === $onDutyDay) {
+                $shiftRoster = $onDutyDay;
+            } else {
+                $shiftList = isset($onDutyDay[$shift]) && is_array($onDutyDay[$shift])
+                    ? $onDutyDay[$shift]
+                    : [];
+                if ($shiftList !== []) {
+                    $shiftRoster = $shiftList;
+                } elseif (isset($onDutyDay['all']) && is_array($onDutyDay['all'])) {
+                    $shiftRoster = $onDutyDay['all'];
+                }
             }
         }
         if (!in_array($employeeId, $shiftRoster, true)) {

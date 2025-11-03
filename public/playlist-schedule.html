@@ -1139,9 +1139,11 @@
       function getPickerEmployeeSets(day, shift) {
         const rosterInfo = state.onDuty[day];
         let rosterIds = [];
-        if (rosterInfo && typeof rosterInfo === 'object') {
-          const list = Array.isArray(rosterInfo[shift]) ? rosterInfo[shift] : [];
-          rosterIds = list.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0);
+        if (rosterInfo && typeof rosterInfo === 'object' && !Array.isArray(rosterInfo)) {
+          const shiftList = Array.isArray(rosterInfo[shift]) ? rosterInfo[shift] : [];
+          const allList = Array.isArray(rosterInfo.all) ? rosterInfo.all : [];
+          const source = shiftList.length > 0 ? shiftList : allList;
+          rosterIds = source.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0);
         } else if (Array.isArray(rosterInfo)) {
           rosterIds = rosterInfo.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0);
         }
