@@ -1147,16 +1147,11 @@
         }
         const rosterSet = new Set(rosterIds);
         const hasRoster = rosterSet.size > 0;
-        const selectedSet = new Set(state.selectedEmpIds.map((id) => Number(id)));
-        const allowAll = selectedSet.size === 0;
         const primary = [];
 
         state.employees.forEach((emp) => {
           const empId = Number(emp.id);
           if (!Number.isFinite(empId) || empId <= 0) {
-            return;
-          }
-          if (!allowAll && !selectedSet.has(empId)) {
             return;
           }
           if (hasRoster && rosterSet.has(empId)) {
