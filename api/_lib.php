@@ -481,6 +481,26 @@ function playlist_shift_label(string $shift): string
     }
 }
 
+function playlist_detect_shift_from_value(string $value): ?string
+{
+    $trimmed = trim($value);
+    if ($trimmed === '') {
+        return null;
+    }
+
+    $lower = mb_strtolower($trimmed, 'UTF-8');
+
+    if (preg_match('/^白/u', $lower) === 1 || mb_strpos($lower, '白') !== false) {
+        return 'white';
+    }
+
+    if (preg_match('/^中/u', $lower) === 1 || mb_strpos($lower, '中') !== false) {
+        return 'mid';
+    }
+
+    return null;
+}
+
 function playlist_normalize_fraction($value): float
 {
     if (is_string($value) || is_numeric($value)) {
