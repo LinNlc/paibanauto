@@ -160,8 +160,16 @@ function handle_playlist_update_cell(array $payload): void
         }
         $employeeName = $map[$employeeId]['label'];
         $onDutyMap = playlist_fetch_on_duty($pdo, $teamId, $day, $day);
-        $onDutyList = $onDutyMap[$day] ?? [];
-        if (!in_array($employeeId, $onDutyList, true)) {
+        $onDutyDay = $onDutyMap[$day] ?? [];
+        $shiftRoster = [];
+        if (is_array($onDutyDay)) {
+            if (isset($onDutyDay[$shift]) && is_array($onDutyDay[$shift])) {
+                $shiftRoster = $onDutyDay[$shift];
+            } elseif (isset($onDutyDay['all']) && is_array($onDutyDay['all'])) {
+                $shiftRoster = $onDutyDay['all'];
+            }
+        }
+        if (!in_array($employeeId, $shiftRoster, true)) {
             json_err('该员工当天未在排班日历上班，无法分配任务', 422);
         }
     }
@@ -250,44 +258,85 @@ function handle_playlist_auto_fill(array $payload): void
     $days = playlist_generate_days($startDate, $endDate);
 
     $onDutyMap = playlist_fetch_on_duty($pdo, $teamId, $startDate, $endDate);
-    $availability = [];
+    $whiteAvailability = [];
+    $midAvailability = [];
     $missingDays = [];
+    $hasAnyAvailability = false;
+
     foreach ($days as $day) {
         $roster = $onDutyMap[$day] ?? [];
-        if ($roster === []) {
-            $missingDays[] = $day;
-            continue;
+
+        $whiteRosterRaw = [];
+        $midRosterRaw = [];
+        $allRosterRaw = [];
+
+        if (is_array($roster) && (isset($roster['white']) || isset($roster['mid']) || isset($roster['all']))) {
+            $whiteRosterRaw = is_array($roster['white'] ?? null) ? $roster['white'] : [];
+            $midRosterRaw = is_array($roster['mid'] ?? null) ? $roster['mid'] : [];
+            $allRosterRaw = is_array($roster['all'] ?? null) ? $roster['all'] : array_merge($whiteRosterRaw, $midRosterRaw);
+        } elseif (is_array($roster)) {
+            $allRosterRaw = $roster;
+            $whiteRosterRaw = $roster;
+            $midRosterRaw = $roster;
         }
-        $allowed = [];
-        foreach ($roster as $empId) {
-            $id = (int) $empId;
-            if (in_array($id, $empList, true)) {
-                $allowed[$id] = $id;
+
+        $normalizeIds = static function (array $source): array {
+            $result = [];
+            foreach ($source as $value) {
+                $id = (int) $value;
+                if ($id > 0) {
+                    $result[$id] = $id;
+                }
             }
-        }
-        if ($allowed === []) {
+            return array_values($result);
+        };
+
+        $filterSelected = static function (array $source) use ($empList): array {
+            $allowed = [];
+            foreach ($source as $value) {
+                $id = (int) $value;
+                if ($id > 0 && in_array($id, $empList, true)) {
+                    $allowed[$id] = $id;
+                }
+            }
+            return array_values($allowed);
+        };
+
+        $whiteRosterAll = $normalizeIds($whiteRosterRaw);
+        $midRosterAll = $normalizeIds($midRosterRaw);
+        $allRosterAll = $normalizeIds($allRosterRaw);
+
+        if ($allRosterAll === []) {
             $missingDays[] = $day;
-            continue;
         }
-        $availability[$day] = array_values($allowed);
+
+        $whiteAllowed = $filterSelected($whiteRosterAll);
+        $midAllowed = $filterSelected($midRosterAll);
+
+        if ($whiteAllowed !== []) {
+            $whiteAvailability[$day] = $whiteAllowed;
+            $hasAnyAvailability = true;
+        }
+
+        if ($midAllowed !== []) {
+            $midAvailability[$day] = $midAllowed;
+            $hasAnyAvailability = true;
+        }
     }
 
-    if ($availability === []) {
+    if (!$hasAnyAvailability) {
         json_err('所选时间段内排班日历为空，存在空班次，请先在排班日历维护班次', 422);
     }
 
-    $whiteAssignments = playlist_generate_assignments($days, $employees, max($whiteDuration, 0.0), $maxDiff, [], $availability);
-    $midAssignments = playlist_generate_assignments($days, $employees, max($midDuration, 0.0), $maxDiff, $whiteAssignments, $availability);
+    $whiteAssignments = playlist_generate_assignments($days, $employees, max($whiteDuration, 0.0), $maxDiff, [], $whiteAvailability);
+    $midAssignments = playlist_generate_assignments($days, $employees, max($midDuration, 0.0), $maxDiff, $whiteAssignments, $midAvailability);
 
     $emptyShiftWarnings = [];
     foreach ($days as $day) {
-        if (!isset($availability[$day])) {
-            continue;
-        }
-        if (!isset($whiteAssignments[$day])) {
+        if (isset($whiteAvailability[$day]) && !isset($whiteAssignments[$day])) {
             $emptyShiftWarnings[] = $day . ' 白班';
         }
-        if (!isset($midAssignments[$day])) {
+        if (isset($midAvailability[$day]) && !isset($midAssignments[$day])) {
             $emptyShiftWarnings[] = $day . ' 中班';
         }
     }
@@ -670,10 +719,40 @@ function playlist_fetch_on_duty(PDO $pdo, int $teamId, string $startDate, string
             continue;
         }
         if (!isset($result[$day])) {
-            $result[$day] = [];
+            $result[$day] = [
+                'all' => [],
+                'white' => [],
+                'mid' => [],
+            ];
         }
-        if (!in_array($empId, $result[$day], true)) {
-            $result[$day][] = $empId;
+        if (!in_array($empId, $result[$day]['all'], true)) {
+            $result[$day]['all'][] = $empId;
+        }
+
+        $shift = playlist_detect_shift_from_value($value);
+        if ($shift !== null && isset($result[$day][$shift]) && !in_array($empId, $result[$day][$shift], true)) {
+            $result[$day][$shift][] = $empId;
+        }
+    }
+
+    foreach ($result as $day => $roster) {
+        $white = array_values(array_unique($roster['white'] ?? []));
+        $mid = array_values(array_unique($roster['mid'] ?? []));
+        $all = $roster['all'] ?? [];
+        if ($all === []) {
+            $all = array_values(array_unique(array_merge($white, $mid)));
+        } else {
+            $all = array_values(array_unique($all));
+        }
+
+        $result[$day] = [
+            'all' => $all,
+            'white' => $white,
+            'mid' => $mid,
+        ];
+
+        if ($result[$day]['all'] === [] && $result[$day]['white'] === [] && $result[$day]['mid'] === []) {
+            unset($result[$day]);
         }
     }
 
@@ -741,6 +820,9 @@ function playlist_generate_assignments(
         }
 
         $allowed = null;
+        if ($availabilityByDay !== [] && !array_key_exists($day, $availabilityByDay)) {
+            continue;
+        }
         if (array_key_exists($day, $availabilityByDay)) {
             $allowedList = $availabilityByDay[$day];
             if (!is_array($allowedList) || $allowedList === []) {

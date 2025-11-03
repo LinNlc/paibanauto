@@ -647,16 +647,49 @@
         if (!raw || typeof raw !== 'object') {
           return {};
         }
-        const normalized = {};
-        Object.entries(raw).forEach(([day, list]) => {
+        const uniqueIds = (list) => {
           if (!Array.isArray(list)) {
-            return;
+            return [];
           }
-          const ids = list
-            .map((value) => Number(value))
-            .filter((id) => Number.isFinite(id) && id > 0);
-          if (ids.length) {
-            normalized[day] = Array.from(new Set(ids));
+          return Array.from(
+            new Set(
+              list
+                .map((value) => Number(value))
+                .filter((id) => Number.isFinite(id) && id > 0)
+            )
+          );
+        };
+        const normalized = {};
+        Object.entries(raw).forEach(([day, value]) => {
+          let entry = null;
+          if (Array.isArray(value)) {
+            const ids = uniqueIds(value);
+            if (!ids.length) {
+              return;
+            }
+            entry = {
+              all: ids,
+              white: [...ids],
+              mid: [...ids],
+            };
+          } else if (value && typeof value === 'object') {
+            const white = uniqueIds(value.white);
+            const mid = uniqueIds(value.mid);
+            let all = uniqueIds(value.all);
+            if (!all.length) {
+              all = Array.from(new Set([...white, ...mid]));
+            }
+            if (!white.length && !mid.length && !all.length) {
+              return;
+            }
+            entry = {
+              all,
+              white,
+              mid,
+            };
+          }
+          if (entry) {
+            normalized[day] = entry;
           }
         });
         return normalized;
@@ -1103,14 +1136,20 @@
         return num.toFixed(2);
       }
 
-      function getPickerEmployeeSets(day) {
-        const roster = Array.isArray(state.onDuty[day]) ? state.onDuty[day] : [];
-        const rosterSet = new Set(roster.map((id) => Number(id)));
+      function getPickerEmployeeSets(day, shift) {
+        const rosterInfo = state.onDuty[day];
+        let rosterIds = [];
+        if (rosterInfo && typeof rosterInfo === 'object') {
+          const list = Array.isArray(rosterInfo[shift]) ? rosterInfo[shift] : [];
+          rosterIds = list.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0);
+        } else if (Array.isArray(rosterInfo)) {
+          rosterIds = rosterInfo.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0);
+        }
+        const rosterSet = new Set(rosterIds);
         const hasRoster = rosterSet.size > 0;
         const selectedSet = new Set(state.selectedEmpIds.map((id) => Number(id)));
         const allowAll = selectedSet.size === 0;
         const primary = [];
-        const fallback = [];
 
         state.employees.forEach((emp) => {
           const empId = Number(emp.id);
@@ -1120,19 +1159,12 @@
           if (!allowAll && !selectedSet.has(empId)) {
             return;
           }
-          if (!hasRoster || rosterSet.has(empId)) {
+          if (hasRoster && rosterSet.has(empId)) {
             primary.push(emp);
-          } else {
-            fallback.push(emp);
           }
         });
 
-        return { primary, fallback };
-      }
-
-      function getEligibleEmployeesForDay(day) {
-        const { primary, fallback } = getPickerEmployeeSets(day);
-        return primary.length ? primary : fallback;
+        return { primary, roster: rosterSet };
       }
 
       function normalizeAutoWarnings(raw) {
@@ -1492,24 +1524,10 @@
         const shifts = state.cells[day] || {};
         const current = shifts[shift] || null;
         elements.pickerSelect.innerHTML = '';
-        const emptyOption = document.createElement('option');
-        emptyOption.value = '';
-        emptyOption.textContent = '未分配';
-        elements.pickerSelect.appendChild(emptyOption);
-        const { primary, fallback } = getPickerEmployeeSets(day);
+        elements.pickerSelect.disabled = false;
+        elements.pickerConfirm.disabled = false;
+        const { primary } = getPickerEmployeeSets(day, shift);
         const eligible = primary;
-        const eligibleIds = new Set(eligible.map((emp) => Number(emp.id)));
-        const fallbackIds = new Set(fallback.map((emp) => Number(emp.id)));
-        const combinedIds = new Set([...eligibleIds, ...fallbackIds]);
-        if (current && current.emp_id && !combinedIds.has(Number(current.emp_id))) {
-          const fallbackOption = document.createElement('option');
-          fallbackOption.value = String(current.emp_id);
-          fallbackOption.textContent = `${employeeLabel({ id: current.emp_id, emp_display: current.emp_display, emp_name: current.emp_name })}（不在名单）`;
-          fallbackOption.selected = true;
-          fallbackOption.disabled = true;
-          elements.pickerSelect.appendChild(fallbackOption);
-          elements.pickerSelect.value = String(current.emp_id);
-        }
         if (eligible.length) {
           eligible.forEach((emp) => {
             const option = document.createElement('option');
@@ -1522,27 +1540,13 @@
           });
         } else {
           const placeholder = document.createElement('option');
-          placeholder.value = '__noeligible';
-          placeholder.textContent = '当日排班日历无可分配人员';
+          placeholder.value = '';
+          placeholder.textContent = '当日该班次排班日历无可分配人员';
           placeholder.disabled = true;
+          placeholder.selected = true;
           elements.pickerSelect.appendChild(placeholder);
-        }
-        if (fallback.length) {
-          const separator = document.createElement('option');
-          separator.value = '__divider';
-          separator.textContent = '──────────';
-          separator.disabled = true;
-          elements.pickerSelect.appendChild(separator);
-          fallback.forEach((emp) => {
-            const option = document.createElement('option');
-            option.value = String(emp.id);
-            option.textContent = `${employeeLabel(emp)}（未在排班日历上班）`;
-            option.disabled = true;
-            if (current && Number(current.emp_id) === Number(emp.id)) {
-              option.selected = true;
-            }
-            elements.pickerSelect.appendChild(option);
-          });
+          elements.pickerSelect.disabled = true;
+          elements.pickerConfirm.disabled = true;
         }
       }
 
@@ -1968,7 +1972,16 @@
         elements.pickerConfirm.addEventListener('click', () => {
           const day = elements.picker.dataset.day;
           const shift = elements.picker.dataset.shift;
-          const empId = Number(elements.pickerSelect.value || 0);
+          const rawValue = elements.pickerSelect.value;
+          if (!rawValue) {
+            App.toast('请选择在班成员', { type: 'error' });
+            return;
+          }
+          const empId = Number(rawValue);
+          if (!Number.isFinite(empId) || empId <= 0) {
+            App.toast('请选择在班成员', { type: 'error' });
+            return;
+          }
           closePicker();
           updateCell(day, shift, empId);
         });
